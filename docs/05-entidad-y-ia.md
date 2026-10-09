@@ -5,7 +5,7 @@
 
 ## Nombre y concepto
 
-Para salvaguardar la originalidad del producto y evadir conflictos legales con los derechos de autor de las comunidades de creadores, se ha conceptualizado una entidad enemiga **completamente exclusiva** para el universo de lovenoho.com. Esta criatura, referida internamente como **"El Olvidado"**, representa la **asimilación antinatural de la cultura laboral moderna y los ritos fúnebres ancestrales**.
+Para salvaguardar la originalidad del producto y evadir conflictos legales con los derechos de autor de las comunidades de creadores, se ha conceptualizado una entidad enemiga **completamente exclusiva** para el universo de NOHO. Esta criatura, referida internamente como **"El Olvidado"**, representa la **asimilación antinatural de la cultura laboral moderna y los ritos fúnebres ancestrales**.
 
 ## Diseño visual
 

@@ -20,6 +20,11 @@ La paleta de colores experimenta una metamorfosis constante a medida que el juga
 
 Los colores del logotipo NOHO (azul, blanco y naranja) **no forman parte de esta paleta**: solo aparecen en los objetos de marca y en las interfaces de menú y cierre (ver `docs/06`).
 
+**Enmienda 2026-10-09, decisión del usuario**: el piso de las oficinas del prólogo
+usa azul NOHO (`#1F5FFF`, el acento usado actualmente en el menú), conservando
+el detalle mate de la alfombra. Esta excepción pertenece a la oficina corporativa;
+la paleta de los backrooms sigue como se describe arriba.
+
 ## Iluminación
 
 La iluminación acompaña este descenso, transformando las **frías luces fluorescentes LED** (que dominan los primeros pasillos) en fuentes de **luz cálidas, orgánicas y parpadeantes** provenientes de **veladoras de cera** dispuestas de forma irracional.
@@ -60,4 +65,4 @@ Las letras monumentales **N, O, H, O**, que funcionan como las llaves de salida 
 - **Cráneos de azúcar** cristalizada de tamaño arquitectónico.
 - Piedra de **obsidiana** pulida.
 
-Estas letras emiten un **resplandor de neón** que contrasta la modernidad de la marca corporativa **lovenoho.com** con el misticismo atávico del folclore mexicano.
+Estas letras emiten un **resplandor de neón** que contrasta la modernidad de la marca corporativa **NOHO** con el misticismo atávico del folclore mexicano.

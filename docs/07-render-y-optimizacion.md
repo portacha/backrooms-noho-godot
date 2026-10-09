@@ -37,6 +37,8 @@ La estética es Low Poly de **colores planos** (`docs/09`), así que no hay "cie
 
 ## Pilar 3 — Iluminación horneada (LightmapGI)
 
+> **Enmendado 2026-10-09**: el prólogo y el Nivel 1 hornean la luz en **colores de vértice** con `tools/build_levels.gd` en lugar de `LightmapGI` (no se puede hornear sin editor). La regla no cambia: cero luces en tiempo real salvo la linterna. Detalle en `docs/15` §2.
+
 Toda la **iluminación estática** se hornea con `LightmapGI`: fluorescentes de oficina, resplandor de veladoras, fosforescencia de las calaveras, neón de las letras.
 
 - Cada **sector se hornea por separado** con su propio `LightmapGI`. Los sectores se unen en umbrales oscuros (marcos de puerta, recodos) para que no se note la costura de luz.

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="DocumentData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/interaction/document_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"D01"
+medium = 2
+file_name = "CORREO_1142.TXT"
+voice = 0
+heading = "Asunto: instalación de pieza central — sala de juntas"
+body = "El lienzo de la campaña NOHO llegó esta noche. La dirección pide instalarlo fuera de horario laboral y no retirarlo bajo ninguna circunstancia. Si limpieza pregunta, ya está en inventario."
+signature = "— Imagen Corporativa"

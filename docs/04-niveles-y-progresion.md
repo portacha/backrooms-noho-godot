@@ -25,7 +25,7 @@ Sitúa al jugador en un entorno laboral moderno, caracterizado por una estética
 
 Al navegar hasta la **sala de juntas** al final del recinto, el jugador descubre un **cuadro pictórico masivo** que domina la pared principal. Este lienzo ilustra el logotipo de NOHO integrado en un diseño abstracto de colores vibrantes que contrastan violentamente con el entorno gris.
 
-Al acercarse para interactuar con la obra, un proceso técnico de **sombreado (shader)** ejecuta una **aberración cromática severa** y un efecto de **distorsión espacial**. El jugador experimenta una pérdida simulada de equilibrio físico en la cámara y **cae hacia adelante, atravesando la superficie bidimensional del cuadro** para ejecutar un *noclip* hacia la dimensión anómala.
+Al acercarse y sostenerle la mirada a la obra, un proceso técnico de **sombreado (shader)** ejecuta una **aberración cromática severa** y un efecto de **distorsión espacial**. El jugador experimenta una pérdida simulada de equilibrio físico en la cámara y **cae hacia adelante, atravesando la superficie bidimensional del cuadro** para ejecutar un *noclip* hacia la dimensión anómala.
 
 ---
 
@@ -81,4 +81,4 @@ Estas islas están interconectadas por **puentes precarios** formados por interm
 - **Diseño geométrico**: plataformas muy simples y caminos estrechos que requieren concentración para no caer al vacío. El ancho mínimo de los puentes se calibra para el joystick táctil; la dificultad viene de la presión, no de la precisión. Caer resulta en un **bucle que teletransporta** al jugador de regreso al inicio del puente.
 - **Clímax**: al interactuar con la última letra, la entidad se enfurece. El entorno sufre **fallas sistémicas**, con **luces rojas de emergencia** bañando el vacío y el diseño sonoro alcanzando un clímax ensordecedor.
 - **Escape**: el jugador debe emplear su resistencia restante para **correr desesperadamente** a través del vacío colapsante hacia una **puerta monumental de madera de roble antiguo**, sobre la cual brilla un espectacular y refulgente **letrero de neón magenta** con el nombre completo **"NOHO"**.
-- **Final**: atravesar esta puerta **silencia de golpe** el entorno, devolviendo al jugador a la oficina inicial frente al cuadro, revelando que el personaje porta ahora un **accesorio comercial de lovenoho.com**, seguido de un desvanecimiento a negro.
+- **Final**: atravesar esta puerta **silencia de golpe** el entorno, devolviendo al jugador a la oficina inicial frente al cuadro, revelando que el personaje porta ahora un **accesorio comercial de NOHO**, seguido de un desvanecimiento a negro.

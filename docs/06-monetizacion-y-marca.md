@@ -7,7 +7,7 @@
 
 *Backrooms NOHO* es un advergame: su valor para la marca depende de la **protección absoluta de la inmersión**. Por eso la marca aparece poco y bien:
 
-- **Solo NOHO / lovenoho.com.** No hay anuncios de terceros, redes publicitarias ni SDK de anuncios.
+- **Solo NOHO.** El nombre de la marca es siempre **NOHO**, en el juego y en la documentación; `lovenoho.com` se escribe únicamente cuando se da la URL (enlaces y llamadas a la acción). No hay anuncios de terceros, redes publicitarias ni SDK de anuncios.
 - **Mínima**: presente al **inicio** (menú) y al **final** (pantallas de resolución).
 - **Nunca bloqueante**: nada retrasa ni condiciona "Jugar" o "Reintentar"; no hay esperas, contadores ni ventanas emergentes.
 - **Colores NOHO como acento**: los colores del logotipo se usan para resaltar detalles, no para cubrir la pantalla.
@@ -24,14 +24,14 @@ Los colores del logotipo NOHO son **azul, blanco y naranja**.
 
 La paleta de marca **no sustituye ni tiñe** la dirección de arte: las letras-altar y el letrero final conservan sus materiales y su neón magenta. El naranja del logotipo y el del cempasúchil conviven, pero son tonos distintos y no se unifican.
 
-> Pendiente: tomar los valores exactos (hex) y la tipografía del logotipo o del manual de marca de lovenoho.com.
+> Pendiente: tomar los valores exactos (hex) y la tipografía del logotipo o del manual de marca de NOHO.
 
 ## Durante la partida: integración diegética
 
 Dentro del juego la marca solo existe como parte del mundo.
 
 - NOHO se asocia con la **salvación y el escape**: en un entorno degradado, las únicas estructuras que proyectan luz, color brillante y acabado pulido son las letras **N, O, H, O**.
-- En el prólogo, objetos de oficina sutilmente membretados con la tipografía de lovenoho.com: cajas de embalaje, tazas de café, papelería, y el cuadro corporativo.
+- En el prólogo, objetos de oficina sutilmente membretados con la tipografía de NOHO: cajas de embalaje, tazas de café, papelería, y el cuadro corporativo.
 
 Nada de esto es interactivo como anuncio ni enlaza fuera del juego.
 

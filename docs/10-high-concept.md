@@ -20,7 +20,7 @@ Un oficinista toca un cuadro corporativo de **NOHO** y cae fuera de la realidad:
 | *Backrooms* / espacios liminales | Geometría repetitiva, incomodidad por ausencia de propósito |
 | Día de Muertos × Mictlán | Invasión estética gradual: cempasúchil, papel picado, calaveras, ofrendas |
 | Horror sin combate (*Amnesia*, *Outlast*) | Vulnerabilidad total: caminar, correr, iluminar, interactuar |
-| Advergame **NOHO / lovenoho.com** | La marca no interrumpe el juego: **es** la mecánica de escape |
+| Advergame **NOHO** | La marca no interrumpe el juego: **es** la mecánica de escape |
 
 ## 3. Pilares de diseño (normativos)
 
@@ -48,7 +48,7 @@ Un oficinista toca un cuadro corporativo de **NOHO** y cae fuera de la realidad:
 | 2 | "Las Ofrendas Infinitas" | **O** | Pavor reverente | Primera manifestación visible de El Olvidado; evitar iluminarlo directamente | ~8 min |
 | 3 | "El Pasaje de las Calaveras" | **H** | Opresión / sigilo | Agua que penaliza el ruido; linterna fallando; cazador activo | ~9 min |
 | 4 | "El Umbral del Mictlán" | **O** | Vértigo y pánico | Caídas que reinician el puente; clímax desesperado hacia la puerta | ~10 min |
-| — | Escape y final | **NOHO** | Catarsis inquietante | Sprint final, silencio de golpe, retorno con accesorio de lovenoho.com | ~2 min |
+| — | Escape y final | **NOHO** | Catarsis inquietante | Sprint final, silencio de golpe, retorno con accesorio de NOHO | ~2 min |
 
 **Arco afectivo global**: inquietud → paranoia → pavor reverente → opresión → vértigo y pánico → catarsis inquietante. Ningún nivel se sale de su emoción dominante; los **remansos de veladoras** (`docs/02`) son las únicas pausas, breves y contemplativas.
 
@@ -60,7 +60,7 @@ Un oficinista toca un cuadro corporativo de **NOHO** y cae fuera de la realidad:
 
 ## 7. Premisa narrativa (resumen)
 
-Un oficinista de cualquier corporación se queda solo frente a un cuadro de **NOHO** en la sala de juntas. Al tocarlo, la realidad se quiebra y cae a través de la pintura a un espacio que combina la esterilidad infinita de una oficina con los ritos del Mictlán. En ese lugar, las cuatro letras de la marca son **altares-ofrenda** que mantienen sellada la salida. *El Olvidado* —algo que también fue oficinista, o eso sugieren los documentos— patrulla el descenso. Al reunir **N-O-H-O**, el jugador abre la puerta de roble bajo el neón magenta y regresa a la oficina… llevando puesto un accesorio de **lovenoho.com**.
+Un oficinista de cualquier corporación se queda solo frente a un cuadro de **NOHO** en la sala de juntas. Al sostenerle la mirada, la realidad se quiebra y cae a través de la pintura a un espacio que combina la esterilidad infinita de una oficina con los ritos del Mictlán. En ese lugar, las cuatro letras de la marca son **altares-ofrenda** que mantienen sellada la salida. *El Olvidado* —algo que también fue oficinista, o eso sugieren los documentos— patrulla el descenso. Al reunir **N-O-H-O**, el jugador abre la puerta de roble bajo el neón magenta y regresa a la oficina… llevando puesto un accesorio de **lovenoho.com**.
 
 El protagonista **no lleva nombre propio en pantalla**: su identidad solo aparece fragmentada en documentos encontrados (decisión que protege el pilar 3 y el aislamiento).
 
@@ -85,9 +85,9 @@ Escalada por nivel: **(1)** solo audio / pasos espejo → **(2)** manifestación
 
 | Ámbito | Regla |
 |---|---|
-| Bucle de juego | **Diegético exclusivamente**: el cuadro y objetos de oficina membretados que evocan lovenoho.com; las letras N-O-H-O *son* la marca |
+| Bucle de juego | **Diegético exclusivamente**: el cuadro y objetos de oficina membretados que evocan a NOHO; las letras N-O-H-O *son* la marca |
 | Menú y pantallas de resolución | Solo NOHO, **mínima y no bloqueante**, con los colores del logotipo (azul, blanco, naranja) como acento; código promo al ganar — ver `docs/06` |
-| Recompensa narrativa del final | El accesorio de lovenoho.com que el personaje lleva de vuelta al mundo real |
+| Recompensa narrativa del final | El accesorio de NOHO que el personaje lleva de vuelta al mundo real |
 
 ## 11. Unique selling points
 
@@ -128,7 +128,7 @@ El sprint final a través del vacío colapsante —luces rojas de emergencia, cl
 - Protagonista **sin nombre propio en pantalla**; identidad solo en documentos encontrados.
 - Duración objetivo de partida: **30–45 min**, seis tramos (prólogo + 4 niveles + escape).
 - Silencio del audio como herramienta de terror activa (no solo ausencia de música).
-- El final devuelve al jugador al mundo real con producto de lovenoho.com: cierre irónico del advergame.
+- El final devuelve al jugador al mundo real con producto de NOHO: cierre irónico del advergame.
 
 ## 16. Próximos documentos de la serie
 

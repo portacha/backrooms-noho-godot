@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="DocumentData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/interaction/document_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"D03"
+medium = 0
+file_name = ""
+voice = 0
+heading = "Acta de instalación N.º 1142"
+body = "Pieza: lienzo corporativo 2.4 × 1.8 m — serie \"Recordar es Volver\".
+Cláusula de conservación: la pieza no debe perderse, ni prestarse, ni olvidarse.
+Responsable de su memoria: el último empleado que la mire."

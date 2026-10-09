@@ -36,7 +36,7 @@ Para salvaguardar la atmósfera opresiva que requiere el género de terror limin
 
 | Ámbito | Tipo de integración |
 |---|---|
-| Bucle de juego principal | Completamente **diegética**: elementos del entorno que evocan sutilmente a **lovenoho.com** |
+| Bucle de juego principal | Completamente **diegética**: elementos del entorno que evocan sutilmente a **NOHO** |
 | Menú de inicio y pantallas de victoria/derrota | Presencia **mínima y no bloqueante**, solo de NOHO, con los colores de la marca como acento |
 
 No hay anuncios de terceros ni nada que retrase "Jugar" o "Reintentar".

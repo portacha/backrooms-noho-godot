@@ -11,8 +11,12 @@ config_version=5
 [application]
 
 config/name="Backrooms NOHO"
-run/main_scene="res://scenes/levels/prologue.tscn"
+run/main_scene="res://scenes/ui/main_menu.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
+
+[autoload]
+
+Game="*res://scripts/core/game.gd"
 
 [display]
 
@@ -23,6 +27,10 @@ window/stretch/mode="canvas_items"
 [filesystem]
 
 import/blender/enabled=false
+
+[gui]
+
+theme/custom_font="res://assets/fonts/nunito_regular.tres"
 
 [input]
 
@@ -73,3 +81,18 @@ interact={
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 environment/defaults/default_clear_color=Color(0.07, 0.06, 0.04, 1)
+
+[shader_globals]
+
+world_light={
+"type": "float",
+"value": 1.0
+}
+flicker_seed={
+"type": "float",
+"value": 0.0
+}
+flicker_override={
+"type": "float",
+"value": -1.0
+}

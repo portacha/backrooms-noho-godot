@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="DocumentData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/interaction/document_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"D02"
+medium = 1
+file_name = ""
+voice = 1
+body = "¿nadie más siente que el cuadro cambia cuando lo miras de reojo?
+llevo 3 noches sin dormir."
+signature = "— M."

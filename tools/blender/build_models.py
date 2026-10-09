@@ -1,0 +1,724 @@
+"""Modelos NOHO: blender -b -P tools/blender/build_models.py -- [nombres]."""
+import math
+import sys
+from pathlib import Path
+import bpy
+import bmesh
+from mathutils import Vector, Matrix
+
+ROOT = Path(__file__).resolve().parents[2]
+PALETTE = dict(zip(
+    'White_Laminate Office_Green Green_Fabric Beige_Plastic Beige_Dark Dark_Plastic Metal_Grey Metal_Dark Walnut Pine Pine_Dark Cardboard Tape Paper Orange_Mug Wax Wax_Shadow Wick Ceiling_Tile Counter_Yellow Counter_Top Rubber Water_Blue Bubble_Wrap Aluminium Sign_Off Flame Glow Screen'.split(),
+    'D9DAD6 1F4634 2A5A45 C2B79E 9C927B 17191B 7F8587 3A3E40 3E2A1D A8845A 8A6A45 A07C55 CDBE9A E2DFD2 E8822A E6DDC2 C9BC98 2A2622 B9AF8E 8B7A46 5A5138 101112 8FB4C8 C9D2D4 A9AEB0 2B302C FFB44C EAF4FF 0A1020'.split()))
+SPECS = {
+    'ceiling_fixture': ((1.28,.68,.10),500),
+    'desk_office': ((1.5,.75,.74),400), 'chair_office': ((.6,.6,.95),900),
+    'terminal_crt': ((.46,.42,.40),500), 'keyboard_retro': ((.42,.16,.04),300),
+    'phone_desk': ((.22,.2,.1),400), 'mug': ((.085,.085,.095),250),
+    'partition_panel': ((1.6,.05,1.25),150), 'filing_cabinet': ((.46,.6,1.32),350),
+    'water_cooler': ((.34,.34,1.35),500), 'trash_bin': ((.28,.28,.32),200),
+    'wall_clock': ((.32,.05,.32),300), 'table_conference': ((1.4,3.4,.74),300),
+    'crate_painting': ((2.,.45,1.45),400), 'box_cardboard_closed': ((.6,.45,.42),80),
+    'box_cardboard_open': ((.45,.4,.32),120), 'ladder_a_frame': ((.55,1.1,1.9),450),
+    'bubble_wrap_roll': ((.4,.4,1.1),200), 'painting_frame': ((2.56,.07,1.96),150),
+    'plaque': ((.44,.02,.56),60), 'door_exit': ((1.16,.12,2.18),300),
+    'exit_sign': ((.5,.07,.18),60), 'reception_counter': ((3.,.9,1.05),300),
+    'reception_small': ((1.7,.7,1.),250), 'candle_short': ((.06,.06,.07),90),
+    'candle_mid': ((.068,.068,.13),90), 'candle_tall': ((.075,.075,.20),90),
+    'ceiling_tile_fallen': ((.6,.6,.03),60), 'flashlight': ((.17,.047,.047),300),
+    'letter_n': ((.5,.1,.62),120), 'chair_tipped': ((.95,.6,.6),900),
+    'sign_wall': ((.62,.026,.2),120), 'sign_wall_right': ((.62,.026,.2),140),
+    'sign_wall_left': ((.62,.026,.2),140), 'sign_hanging': ((.9,.05,.56),160),
+    'frame_small': ((.5,.154,.774),200), 'reception_desk': ((3.4,1.,1.08),700),
+    'reception_wing': ((1.25,.65,1.08),400), 'wall_slats': ((4.,.085,2.78),320),
+    'logo_plate': ((1.5,.045,.46),160), 'door_portal': ((2.32,.106,2.34),80),
+    'column_round': ((.4,.38,2.8),160), 'bench_waiting': ((1.6,.48,.48),160),
+    'planter': ((.58,.69,1.24),240),
+}
+# Las medidas nominales excluyen asa, pies de partición y solapas abiertas.
+MATS = {}
+# Letreros y piezas de pared: cuelgan de pared o techo, su origen no va al suelo.
+SIGNS = ('sign_wall','sign_wall_right','sign_wall_left','sign_hanging','frame_small','logo_plate')
+CEILING_MODELS = ('ceiling_fixture',)
+
+
+def material(name):
+    if name not in MATS:
+        h = PALETTE[name]
+        srgb = [int(h[i:i+2],16)/255 for i in (0,2,4)]
+        linear = [v/12.92 if v <= .04045 else ((v+.055)/1.055)**2.4 for v in srgb]
+        m = bpy.data.materials.get(name) or bpy.data.materials.new(name)
+        m.use_nodes = True
+        bsdf = m.node_tree.nodes.get('Principled BSDF')
+        bsdf.inputs['Base Color'].default_value = (*linear,1)
+        bsdf.inputs['Roughness'].default_value = 1
+        m.diffuse_color = (*linear,1)
+        MATS[name] = m
+    return MATS[name]
+
+
+def mesh(name, verts, faces, mat):
+    data = bpy.data.meshes.new(name)
+    data.from_pydata(verts, [], faces)
+    data.update()
+    uv=data.uv_layers.new(name='UVMap')
+    for poly in data.polygons:
+        axes=sorted(range(3),key=lambda i:abs(poly.normal[i]))[:2]
+        for li in poly.loop_indices:
+            p=data.vertices[data.loops[li].vertex_index].co
+            uv.data[li].uv=(p[axes[0]],p[axes[1]])
+    # Normales coherentes incluso en perfiles cóncavos.
+    bm = bmesh.new()
+    bm.from_mesh(data)
+    bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
+    bm.to_mesh(data)
+    bm.free()
+    o = bpy.data.objects.new(name,data)
+    bpy.context.collection.objects.link(o)
+    o.data.materials.append(material(mat))
+    for p in data.polygons:
+        p.use_smooth = False
+    return o
+
+
+def bevel(o, width):
+    bpy.context.view_layer.objects.active = o
+    mod = o.modifiers.new('Chaflán','BEVEL')
+    mod.width = width
+    mod.segments = 1
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+    return o
+
+
+def prism(name, outline, bottom, top, mat, axis='Z'):
+    n = len(outline)
+    def point(p,h):
+        return (p[0],p[1],h) if axis == 'Z' else (p[0],h,p[1])
+    v = [point(p,h) for h in (bottom,top) for p in outline]
+    f = [tuple(range(n-1,-1,-1)), tuple(range(n,2*n))]
+    f += [(i,(i+1)%n,(i+1)%n+n,i+n) for i in range(n)]
+    return mesh(name,v,f,mat)
+
+
+def rect(w,d,c=0):
+    x,y = w/2,d/2
+    if not c:
+        return [(-x,-y),(x,-y),(x,y),(-x,y)]
+    return [(-x+c,-y),(x-c,-y),(x,-y+c),(x,y-c),(x-c,y),(-x+c,y),(-x,y-c),(-x,-y+c)]
+
+
+def box(name, loc, size, mat, chamfer=0):
+    o = prism(name,rect(size[0],size[1]),-size[2]/2,size[2]/2,mat)
+    for v in o.data.vertices:
+        v.co += Vector(loc)
+    return bevel(o,chamfer) if chamfer else o
+
+
+def slab(name, loc, size, mat, clip=.02):
+    o = prism(name,rect(size[0],size[1],clip),-size[2]/2,size[2]/2,mat)
+    for v in o.data.vertices:
+        v.co += Vector(loc)
+    return o
+
+
+def beam(name,a,b,width,depth,mat):
+    a,b = Vector(a),Vector(b)
+    o = box(name,(0,0,0),(width,depth,(b-a).length),mat)
+    rot = (b-a).to_track_quat('Z','Y').to_matrix()
+    for v in o.data.vertices:
+        v.co = rot @ v.co + (a+b)/2
+    return o
+
+
+def lathe(name, rings, mat, n=8, loc=(0,0,0), axis='Z', caps=True):
+    # Perfil radial: permite cuellos, rebordes e interiores abiertos.
+    verts = []
+    for r,z in rings:
+        for i in range(n):
+            t = 2*math.pi*i/n
+            p = Vector((r*math.cos(t),r*math.sin(t),z))
+            if axis == 'X': p = Vector((p.z,p.y,-p.x))
+            if axis == 'Y': p = Vector((p.x,-p.z,p.y))
+            verts.append(p+Vector(loc))
+    faces = [(j*n+i,j*n+(i+1)%n,(j+1)*n+(i+1)%n,(j+1)*n+i)
+             for j in range(len(rings)-1) for i in range(n)]
+    if caps:
+        faces += [tuple(range(n-1,-1,-1)),tuple(range((len(rings)-1)*n,len(rings)*n))]
+    return mesh(name,verts,faces,mat)
+
+
+def tube(name, points, radius, mat, sides=4):
+    verts=[]
+    for j,p in enumerate(points):
+        tangent=Vector(points[min(j+1,len(points)-1)])-Vector(points[max(0,j-1)])
+        rot=tangent.to_track_quat('Z','Y').to_matrix()
+        for i in range(sides):
+            a=2*math.pi*i/sides
+            verts.append(Vector(p)+rot @ Vector((radius*math.cos(a),radius*math.sin(a),0)))
+    faces=[(j*sides+i,j*sides+(i+1)%sides,(j+1)*sides+(i+1)%sides,(j+1)*sides+i)
+           for j in range(len(points)-1) for i in range(sides)]
+    faces += [tuple(range(sides-1,-1,-1)),tuple(range((len(points)-1)*sides,len(points)*sides))]
+    return mesh(name,verts,faces,mat)
+
+
+def frame(name,w,h,opening_w,opening_h,depth,mat,z=0):
+    # Marco cerrado de perfil escalonado: el hueco no tiene caras.
+    loops=[(w,h,0),(w,h,-depth*.65),(w-.015,h-.015,-depth),
+           (opening_w,opening_h,-depth*.85),(opening_w,opening_h,0)]
+    verts=[(x,y,zz+z) for ww,hh,y in loops for x,zz in rect(ww,hh)]
+    faces=[]
+    for j in range(len(loops)):
+        k=(j+1)%len(loops)
+        for i in range(4): faces.append((j*4+i,j*4+(i+1)%4,k*4+(i+1)%4,k*4+i))
+    return mesh(name,verts,faces,mat)
+
+
+def ceiling_fixture():
+    # Origen en el plano del plafón; la carcasa cuelga hacia Z negativo.
+    # Aro continuo con pestaña superior, canto biselado y asiento del difusor.
+    loops = [(1.28,.68,0), (1.28,.68,-.055),
+             (1.26,.66,-.085), (1.20,.60,-.085),
+             (1.18,.58,-.055), (1.18,.58,0)]
+    verts = [(x,y,z) for w,d,z in loops for x,y in rect(w,d)]
+    faces = [(j*4+i,j*4+(i+1)%4,((j+1)%len(loops))*4+(i+1)%4,
+              ((j+1)%len(loops))*4+i) for j in range(len(loops)) for i in range(4)]
+    mesh('Marco plegado',verts,faces,'White_Laminate')
+    # Retícula antideslumbrante delante del difusor: una espina y seis travesaños.
+    box('Espina central',(0,0,-.082),(1.18,.014,.025),'Aluminium')
+    for i in range(6):
+        x = -.45+i*.18
+        box('Lama reflector',(x,0,-.082),(.012,.58,.025),'Aluminium')
+    for x in (-.625,.625):
+        for y in (-.20,.20):
+            slab('Pestaña cierre',(x,y,-.093),(.024,.055,.014),'Metal_Grey',.004)
+            box('Ranura cierre',(x,y,-.100),(.012,.003,.001),'Metal_Dark')
+
+
+def desk_office():
+    slab('Tablero',(0,0,.715),(1.5,.75,.05),'White_Laminate',.025)
+    slab('Canto',(0,0,.686),(1.5,.75,.014),'Office_Green',.025)
+    box('Pedestal',(.49,.04,.34),(.43,.64,.66),'Office_Green',.01)
+    for i in range(3):
+        z=.14+i*.205
+        slab('Cajón',(.49,-.291,z),(.405,.018,.188),'Beige_Plastic',.009)
+        box('Tirador hundido',(.49,-.303,z+.041),(.13,.007,.028),'Beige_Dark')
+        box('Labio',(.49,-.312,z+.03),(.12,.014,.009),'Metal_Grey')
+    box('Faldón',(-.1,.30,.44),(.95,.025,.40),'Office_Green')
+    for y in (-.27,.27):
+        box('Pata',(-.63,y,.35),(.045,.045,.66),'Metal_Grey')
+        slab('Pie',(-.63,y,.017),(.18,.13,.034),'Metal_Dark',.02)
+
+
+def chair_office():
+    lathe('Columna',[(.032,.11),(.032,.32),(.043,.32),(.043,.43)],'Metal_Dark')
+    for i in range(5):
+        a=2*math.pi*i/5+math.pi/2
+        x,y=.255*math.cos(a),.255*math.sin(a)
+        beam('Radio',(0,0,.17),(x,y,.075),.046,.042,'Dark_Plastic')
+        lathe('Rueda',[(.035,-.022),(.035,.022)],'Dark_Plastic',8,(x,y,.035),'X')
+        box('Horquilla',(x,y,.082),(.028,.048,.04),'Metal_Dark')
+    slab('Asiento',(0,-.015,.455),(.47,.45,.09),'Green_Fabric',.065)
+    slab('Bandeja',(0,-.01,.402),(.35,.31,.025),'Dark_Plastic',.04)
+    tube('Soporte curvado',[(0,.13,.41),(0,.21,.50),(0,.245,.66),(0,.26,.83)],.025,'Metal_Dark')
+    # Respaldo cóncavo, segmentos anchos y bordes recortados.
+    outline=[(-.205,.59),(-.235,.63),(-.235,.89),(-.19,.95),(.19,.95),(.235,.89),(.235,.63),(.205,.59)]
+    o=prism('Respaldo',outline,.205,.275,'Green_Fabric','Y')
+    for v in o.data.vertices:
+        v.co.y += .045*(1-(v.co.x/.235)**2)
+    bevel(o,.014)
+
+
+def terminal_crt():
+    slab('Base',(0,.015,.019),(.28,.26,.038),'Beige_Dark',.025)
+    box('Articulación',(0,.01,.068),(.12,.12,.065),'Beige_Plastic',.012)
+    # Carcasa con trasera estrecha, bisel frontal y panza del tubo.
+    loops=[(.46,.31,-.21,.24),(.46,.31,-.165,.24),(.32,.25,.21,.245)]
+    verts=[(x,y,z+zc) for w,h,y,zc in loops for x,z in rect(w,h,.022)]
+    faces=[]
+    for j in range(2):
+        for i in range(8): faces.append((j*8+i,j*8+(i+1)%8,(j+1)*8+(i+1)%8,(j+1)*8+i))
+    faces += [tuple(range(16,24))]
+    mesh('Carcasa',verts,faces,'Beige_Plastic')
+    # Bisel con abertura real; no una placa que oculte el cristal.
+    o=frame('Bisel',.418,.276,.31,.233,.018,'Beige_Dark',.245)
+    for v in o.data.vertices: v.co.y -= .192
+    screen=mesh('Cristal CRT',[(-.15,-.208,.1325),(.15,-.208,.1325),(.15,-.208,.3575),(-.15,-.208,.3575),(0,-.215,.245)],[(0,1,4),(1,2,4),(2,3,4),(3,0,4)],'Screen')
+    uv=screen.data.uv_layers.active
+    for p in screen.data.polygons:
+        for li in p.loop_indices:
+            v=screen.data.vertices[screen.data.loops[li].vertex_index].co
+            uv.data[li].uv=((v.x+.15)/.30,(v.z-.1325)/.225)
+    for side in (-1,1):
+        for i in range(5):
+            box('Ranura ventilación',(side*(.226-i*.01),-.125+i*.047,.265),(.003,.023,.067),'Beige_Dark')
+    lathe('Piloto',[(.005,0),(.005,.003)],'Office_Green',6,(.175,-.209,.118),'Y')
+
+
+def keyboard_retro():
+    o=box('Carcasa teclado',(0,0,.018),(.42,.16,.036),'Beige_Plastic',.008)
+    for v in o.data.vertices: v.co.z *= .5+(v.co.y+.08)/.16*.5
+    for row in range(4):
+        # Teclas agrupadas; cada separación es geometría, no textura.
+        for col in range(5):
+            box('Grupo teclas',(-.15+col*.075,-.045+row*.029,.017+row*.0055),(.068,.023,.01),'Beige_Dark')
+    box('Espacio',(0,-.068,.012),(.19,.015,.008),'Beige_Dark')
+
+
+def phone_desk():
+    base=slab('Base teléfono',(0,0,.025),(.205,.185,.05),'Beige_Plastic',.028)
+    for v in base.data.vertices: v.co.z *= .7+(v.co.y+.1)*1.5
+    for i in range(3):
+        for j in range(3): box('Botón',(-.033+j*.033,-.058+i*.026,.043+i*.004),(.022,.018,.007),'Dark_Plastic')
+    for x in (-.073,.073):
+        slab('Auricular',(x,.049,.065),(.059,.073,.046),'Beige_Plastic',.016)
+    tube('Puente auricular',[(-.071,.049,.073),(-.042,.058,.085),(.042,.058,.085),(.071,.049,.073)],.014,'Beige_Plastic')
+    points=[]
+    for i in range(17):
+        t=i/16
+        points.append((-.099+.009*math.sin(t*8*math.pi),.037-.10*t,.05-.015*t+.008*math.cos(t*8*math.pi)))
+    tube('Cable rizado',points,.0025,'Dark_Plastic',3)
+
+
+def mug():
+    lathe('Taza',[(.034,0),(.041,.008),(.0425,.091),(.039,.095),(.0345,.091),(.033,.015)],'Orange_Mug',12)
+    pts=[(.037,0,.079),(.059,0,.083),(.070,0,.067),(.070,0,.033),(.058,0,.019),(.037,0,.023)]
+    tube('Asa',pts,.007,'Orange_Mug',6)
+
+
+def partition_panel():
+    box('Panel',(0,0,.65),(1.54,.033,1.16),'Green_Fabric')
+    for x in (-.785,.785): box('Montante',(x,0,.65),(.03,.05,1.2),'Metal_Grey')
+    for z in (.065,1.235): box('Travesaño',(0,0,z),(1.6,.05,.03),'Metal_Grey')
+    for x in (-.57,.57): slab('Pie',(x,0,.016),(.16,.3,.032),'Metal_Grey',.016)
+
+
+def filing_cabinet():
+    box('Chasis',(0,.014,.66),(.46,.572,1.32),'Metal_Grey',.008)
+    for i in range(4):
+        z=.185+i*.315
+        slab('Frente cajón',(0,-.295,z),(.412,.01,.28),'Metal_Grey',.009)
+        box('Etiqueta',(0,-.304,z+.065),(.095,.008,.032),'Metal_Dark')
+        for x in (-.062,.062): box('Soporte asa',(x,-.317,z),(.016,.035,.018),'Metal_Dark')
+        box('Asa',(0,-.336,z),(.14,.013,.018),'Metal_Dark')
+
+
+def water_cooler():
+    slab('Base',(0,0,.035),(.34,.34,.07),'Beige_Dark',.025)
+    # Bahía abierta construida con paredes: grifos y bandeja dentro del hueco.
+    slab('Cuerpo inferior',(0,0,.30),(.33,.33,.50),'White_Laminate',.025)
+    box('Trasera bahía',(0,.105,.69),(.31,.10,.29),'White_Laminate')
+    for x in (-.144,.144): box('Lateral bahía',(x,-.04,.69),(.04,.25,.29),'White_Laminate')
+    slab('Techo',(0,0,.85),(.33,.33,.06),'White_Laminate',.025)
+    for x in (-.067,.067):
+        tube('Grifo',[(x,.052,.745),(x,-.083,.745),(x,-.083,.712)],.013,'Beige_Dark')
+        box('Palanca',(x,-.04,.777),(.017,.043,.015),'Dark_Plastic')
+    slab('Bandeja',(0,-.08,.562),(.24,.16,.025),'Beige_Dark',.018)
+    for i in range(4): box('Rejilla',(-.075+i*.05,-.086,.58),(.018,.115,.009),'Metal_Grey')
+    lathe('Garrafón',[(.055,.88),(.055,.94),(.118,.98),(.145,1.035),(.145,1.29),(.119,1.35)],'Water_Blue',12)
+    for z in (1.07,1.25): lathe('Nervio botella',[(.145,z),(.15,z+.015),(.145,z+.03)],'Water_Blue',12,caps=False)
+
+
+def trash_bin():
+    lathe('Papelera',[(.108,0),(.14,.305),(.138,.32),(.128,.32),(.127,.305),(.098,.018)],'Metal_Dark',12)
+
+
+def wall_clock():
+    lathe('Reloj aro',[(.145,0),(.16,.009),(.16,.043),(.147,.05),(.14,.047),(.14,.032)],'Dark_Plastic',16,axis='Y')
+    mesh('Esfera',[(.14*math.cos(i*math.pi/8),-.034,.14*math.sin(i*math.pi/8)) for i in range(16)],[tuple(range(16))],'Paper')
+    for i in range(12):
+        a=2*math.pi*i/12
+        mesh('Índice',[(r*math.sin(a)+offset*math.cos(a),-.036,r*math.cos(a)-offset*math.sin(a)) for r,offset in ((.117,-.003),(.132,-.003),(.132,.003),(.117,.003))],[(0,1,2,3)],'Dark_Plastic')
+    for angle,length,width in ((2*math.pi*47/60,.112,.005),(2*math.pi*(11+47/60)/12,.073,.009)):
+        beam('Aguja',(0,-.04,0),(length*math.sin(angle),-.04,length*math.cos(angle)),width,.004,'Dark_Plastic')
+    lathe('Eje',[(.009,.04),(.009,.045)],'Dark_Plastic',6,axis='Y')
+
+
+def table_conference():
+    outline=[(-.45,-1.7),(.45,-1.7),(.64,-1.45),(.7,-.7),(.7,.7),(.64,1.45),(.45,1.7),(-.45,1.7),(-.64,1.45),(-.7,.7),(-.7,-.7),(-.64,-1.45)]
+    bevel(prism('Tablero barco',outline,.675,.74,'Walnut'),.012)
+    for y in (-.95,.95):
+        slab('Pata panel',(0,y,.34),(.75,.10,.68),'Walnut',.025)
+        slab('Zócalo',(0,y,.025),(.90,.24,.05),'Metal_Dark',.02)
+    box('Travesaño',(0,0,.24),(.10,1.9,.12),'Walnut')
+
+
+def crate_painting():
+    for side in (-1,1):
+        y=side*.193
+        for i in range(5): box('Tabla',(-.8+i*.4,y,.77),(.392,.035,1.30),'Pine')
+        for x in (-.96,.96): box('Batiente',(x,side*.211,.77),(.08,.028,1.35),'Pine_Dark')
+        for z in (.135,1.405): box('Batiente',(0,side*.211,z),(2.,.028,.09),'Pine_Dark')
+        beam('Diagonal',(-.9,side*.211,.22),(.9,side*.211,1.33),.062,.028,'Pine_Dark')
+    for x in (-.98,.98): box('Costado',(x,0,.77),(.04,.38,1.30),'Pine')
+    for z in (.145,1.395): box('Cierre',(0,0,z),(1.94,.38,.04),'Pine')
+    for x in (-.75,.75): box('Patín',(x,0,.06),(.16,.45,.12),'Pine_Dark')
+    for x in (-.95,.95):
+        for z in (.20,1.32): box('Refuerzo esquina',(x,0,z),(.10,.40,.10),'Pine_Dark')
+
+
+def box_cardboard_closed():
+    o=box('Caja',(0,0,.21),(.6,.45,.42),'Cardboard',.005)
+    for v in o.data.vertices: v.co.x += .008*(v.co.z/.42-.5)*(v.co.y/.45)
+    box('Cinta superior',(0,0,.422),(.058,.447,.002),'Tape')
+    for y in (-.226,.226): box('Cinta lateral',(0,y,.31),(.058,.002,.22),'Tape')
+
+
+def box_cardboard_open():
+    # Pared fina, interior vacío y cuatro solapas dobladas de modo distinto.
+    box('Fondo',(0,0,.005),(.45,.4,.01),'Cardboard')
+    for x in (-.22,.22): box('Pared',(x,0,.16),(.01,.4,.32),'Cardboard')
+    for y in (-.195,.195): box('Pared',(0,y,.16),(.43,.01,.32),'Cardboard')
+    for axis,side,angle in [('X',-1,-.40),('X',1,.28),('Y',-1,-.65),('Y',1,.8)]:
+        if axis=='X':
+            o=box('Solapa',(0,0,.09),(.01,.39,.18),'Cardboard')
+            rot=Matrix.Rotation(angle,3,'Y'); hinge=Vector((side*.225,0,.32))
+        else:
+            o=box('Solapa',(0,0,.08),(.43,.01,.16),'Cardboard')
+            rot=Matrix.Rotation(-angle,3,'X'); hinge=Vector((0,side*.20,.32))
+        for v in o.data.vertices: v.co=rot @ v.co+hinge
+
+
+def ladder_a_frame():
+    for side in (-1,1):
+        for x in (-.24,.24):
+            beam('Larguero',(x,side*.52,.04),(x,side*.07,1.85),.045,.055,'Aluminium')
+            box('Zapato',(x,side*.52,.035),(.068,.06,.07),'Rubber')
+    for i in range(6):
+        z=.24+i*.27; y=-.52+(z-.04)/1.81*.45
+        slab('Peldaño',(0,y,z),(.49,.14,.036),'Aluminium',.009)
+    for z in (.40,1.05):
+        y=.52-(z-.04)/1.81*.45
+        box('Travesaño posterior',(0,y,z),(.48,.025,.038),'Aluminium')
+    for x in (-.245,.245):
+        beam('Compás',(x,-.28,.96),(x,0,.92),.014,.026,'Metal_Grey')
+        beam('Compás',(x,0,.92),(x,.28,.96),.014,.026,'Metal_Grey')
+    slab('Tapa',(0,0,1.872),(.55,.24,.056),'Aluminium',.018)
+
+
+def bubble_wrap_roll():
+    lathe('Rollo',[(.19,0),(.2,.025),(.2,1.08),(.19,1.1),(.046,1.1),(.045,0)],'Bubble_Wrap',12)
+    # Espiral en relieve en el extremo superior, sin textura.
+    pts=[]
+    for i in range(7):
+        a=i/6*math.pi*3.7; r=.048+i/6*.13
+        pts.append((r*math.cos(a),r*math.sin(a),1.104))
+    tube('Espiral',pts,.004,'Bubble_Wrap',3)
+    o=mesh('Solapa',[(-.14,-.14,.04),(-.14,-.14,1.06),(-.20,-.17,1.03),(-.20,-.17,.08),(-.24,-.13,.10),(-.24,-.13,.93)],[(0,1,2,3),(3,2,5,4)],'Bubble_Wrap')
+    bpy.context.view_layer.objects.active=o
+    mod=o.modifiers.new('Espesor envoltura','SOLIDIFY'); mod.thickness=.003
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+
+
+def painting_frame(): frame('Marco galería',2.56,1.96,2.4,1.8,.07,'Dark_Plastic')
+
+
+def plaque():
+    frame('Marco aviso',.44,.56,.404,.524,.02,'Dark_Plastic')
+    prism('Hoja',rect(.404,.524),-.013,-.012,'Paper','Y')
+
+
+def door_exit():
+    for x in (-.54,.54): box('Jamba',(x,-.06,1.09),(.08,.12,2.18),'Metal_Dark')
+    box('Dintel',(0,-.06,2.14),(1.08,.12,.08),'Metal_Dark')
+    # Hoja formada alrededor de dos huecos con paneles retrasados.
+    for x in (-.453,.453): box('Hoja montante',(x,-.047,1.07),(.094,.056,2.10),'Office_Green')
+    for z,h in ((.08,.12),(.99,.11),(2.06,.12)):
+        box('Hoja travesaño',(0,-.047,z),(.81,.056,h),'Office_Green')
+    for z,h in ((.545,.79),(1.55,.96)):
+        box('Panel hundido',(0,-.028,z),(.812,.018,h),'Office_Green')
+    box('Placa cerradura',(.38,-.08,1.05),(.048,.012,.14),'Metal_Grey',.004)
+    beam('Manilla',(.38,-.089,1.07),(.38,-.11,1.07),.017,.018,'Metal_Grey')
+    beam('Palanca',(.38,-.11,1.07),(.27,-.11,1.07),.017,.018,'Metal_Grey')
+    for z in (.31,1.08,1.86): lathe('Bisagra',[(.012,z-.038),(.012,z+.038)],'Metal_Grey',6,(-.506,-.07,0))
+
+
+def exit_sign():
+    box('Carcasa',(0,-.035,0),(.5,.07,.15),'Beige_Plastic',.003)
+    mesh('Cara apagada',[(-.237,-.071,-.06),(.237,-.071,-.06),(.237,-.071,.06),(-.237,-.071,.06)],[(0,1,2,3)],'Sign_Off')
+    box('Soporte',(0,-.015,.0975),(.13,.027,.045),'Metal_Grey')
+
+
+def reception(w=3.,d=.9,h=1.05):
+    slab('Encimera pública',(0,-d/2+.095,h-.023),(w,.19,.046),'Counter_Top',.025)
+    # Listones con surcos reales (separados y oscuros al fondo).
+    box('Frente',(0,-d/2+.043,h*.52),(w-.04,.055,h-.14),'Counter_Yellow')
+    count=9 if w>2 else 6
+    for i in range(count):
+        x=-w/2+.025+(i+.5)*(w-.05)/count
+        box('Listón',(x,-d/2+.009,h*.52),((w-.05)/count-.012,.018,h-.18),'Counter_Yellow')
+    box('Zócalo',(0,-d/2+.05,.046),(w-.10,.10,.092),'Counter_Top')
+    slab('Mesa trabajo',(0,.10,h-.24),(w-.10,d-.25,.044),'Counter_Top',.02)
+    for x in (-w/2+.04,w/2-.04): box('Lateral',(x,.10,(h-.27)/2),(.06,d-.20,h-.27),'Counter_Yellow')
+    box('Divisor',(w*.12,.12,(h-.27)/2),(.045,d-.23,h-.27),'Counter_Yellow')
+    box('Estante',(w*.30,.11,.30),(w*.33,d-.24,.035),'Counter_Top')
+
+
+def reception_modern(w,d=1.,h=1.08):
+    # Mostrador de recepción: frente alto de listones de nogal sobre cuerpo blanco, repisa pública
+    # y mesa de trabajo detrás. El frente mira a -Y.
+    f=-d/2
+    box('Zócalo',(0,f+.09,.05),(w-.08,.1,.1),'Dark_Plastic')
+    box('Frente',(0,f+.05,.1+(h-.15)/2),(w,.06,h-.15),'White_Laminate')
+    count=round(w/.17)
+    for i in range(count):
+        x=-w/2+(i+.5)*w/count
+        box('Listón',(x,f+.01,.16+(h-.27)/2),(w/count-.06,.02,h-.27),'Walnut')
+    slab('Repisa',(0,f+.14,h-.025),(w,.28,.05),'White_Laminate',.02)
+    slab('Mesa trabajo',(0,f+.26+(d-.26)/2,.72),(w-.06,d-.26,.04),'White_Laminate',.02)
+    for x in (-w/2+.025,w/2-.025): box('Lateral',(x,.04,.35),(.05,d-.08,.70),'White_Laminate')
+    if w>2:
+        box('Cajonera',(w/2-.36,f+.6,.38),(.46,.56,.6),'Walnut',.008)
+        for i in range(3):
+            slab('Cajón',(w/2-.36,f+.889,.19+i*.19),(.42,.018,.17),'White_Laminate',.008)
+        box('Bandeja',(-w/2+.5,f+.5,.75),(.34,.26,.02),'Metal_Dark',.004)
+
+
+def frame_small():
+    # Cuadro pequeño de pasillo con su aplique de latón. El lienzo lo pone el juego.
+    frame('Marco',.5,.62,.42,.54,.03,'Walnut')
+    prism('Paspartú',rect(.42,.54),-.012,-.010,'Paper','Y')
+    box('Roseta',(0,-.008,.385),(.09,.016,.05),'Counter_Yellow',.004)
+    tube('Brazo',[(0,-.016,.385),(0,-.075,.425),(0,-.13,.44)],.008,'Counter_Yellow')
+    lathe('Pantalla',[(.024,-.15),(.024,.15)],'Counter_Yellow',6,(0,-.13,.44),'X')
+
+
+def wall_slats():
+    # Muro de acento: listones verticales de nogal sobre fondo oscuro.
+    box('Fondo',(0,.02,1.39),(4.,.04,2.78),'Dark_Plastic')
+    for i in range(20):
+        box('Listón',(-1.9+i*.2,-.02,1.39),(.11,.05,2.78),'Walnut')
+
+
+def logo_plate():
+    # Placa separada del muro por cuatro casquillos; el rótulo lo escribe el juego.
+    box('Placa',(0,-.03,0),(1.5,.03,.46),'White_Laminate',.006)
+    for x in (-.68,.68):
+        for z in (-.17,.17):
+            lathe('Casquillo',[(.014,0),(.014,.015)],'Aluminium',6,(x,0,z),'Y')
+
+
+def door_portal():
+    # Portada de la sala de juntas: jambas y dintel de nogal con filete de latón.
+    for x in (-1.08,1.08): box('Jamba',(x,0,1.17),(.16,.1,2.34),'Walnut')
+    box('Dintel',(0,0,2.22),(2.,.1,.24),'Walnut')
+    box('Filete',(0,-.053,2.11),(2.,.006,.02),'Counter_Yellow')
+
+
+def column_round():
+    lathe('Fuste',[(.2,0),(.2,.08),(.16,.1),(.16,2.68),(.2,2.7),(.2,2.8)],'White_Laminate',10)
+
+
+def bench_waiting():
+    slab('Asiento',(0,0,.40),(1.6,.48,.06),'Walnut',.03)
+    slab('Cojín',(0,0,.455),(1.5,.42,.05),'Green_Fabric',.04)
+    for x in (-.62,.62): box('Pata',(x,0,.185),(.05,.4,.37),'Metal_Dark')
+    box('Travesaño',(0,0,.1),(1.24,.03,.03),'Metal_Dark')
+
+
+def planter():
+    # Jardinera con lengua de suegra: hojas planas que se afinan hacia la punta.
+    box('Maceta',(0,0,.25),(.38,.38,.5),'White_Laminate',.02)
+    box('Tierra',(0,0,.505),(.33,.33,.02),'Walnut')
+    for i in range(7):
+        a=2*math.pi*i/7+.3
+        length=.52+.09*((i*5)%4)
+        base=Vector((.07*math.cos(a),.07*math.sin(a),.51))
+        tip=base+Vector((.16*math.cos(a)*(1+i%2),.16*math.sin(a)*(1+i%2),length))
+        o=lathe('Hoja',[(.022,0),(.036,length*.45),(.004,length)],'Office_Green' if i%2 else 'Green_Fabric',4)
+        rot=(tip-base).to_track_quat('Z','Y').to_matrix() @ Matrix.Rotation(a,3,'Z')
+        for v in o.data.vertices:
+            v.co=rot @ Vector((v.co.x,v.co.y*.3,v.co.z))+base
+
+
+def candle(height,dia,variant):
+    n=8; radius=dia/2; top=height-.023
+    rings=[]
+    for level in range(3):
+        for i in range(n):
+            a=2*math.pi*i/n
+            r=radius*(.82 if level==0 else .88 if level==1 else .80)*(1+.05*math.sin(i*2.1+variant))
+            z=(.004,top-.008,top)[level]
+            if level==2: z-=.006*(1+math.sin(a+variant))/2
+            rings.append((r*math.cos(a),r*math.sin(a),z))
+    faces=[tuple(range(7,-1,-1))]
+    faces += [(j*n+i,j*n+(i+1)%n,(j+1)*n+(i+1)%n,(j+1)*n+i) for j in range(2) for i in range(n)]
+    rings.append((0,0,top-.010))
+    faces += [(16+i,16+(i+1)%n,24) for i in range(n)]
+    mesh('Cera derretida',rings,faces,'Wax')
+    mesh('Charco',[(radius*math.cos(i*math.pi/4),radius*math.sin(i*math.pi/4),0) for i in range(8)],[tuple(range(8))],'Wax_Shadow')
+    for i in range(2):
+        index=6+i
+        a=index*math.pi/4
+        variation=1+.05*math.sin(index*2.1+variant)
+        ztop=top-.010
+        ztip=max(.008,ztop-(.012+.009*variant+.004*i))
+        def wall_radius(z):
+            t=max(0,min(1,(z-.004)/(top-.012)))
+            return radius*(.82+.06*t)*variation
+        def point(z,extra=0,tangent=0):
+            r=wall_radius(z)+extra
+            return (r*math.cos(a)-tangent*math.sin(a),r*math.sin(a)+tangent*math.cos(a),z)
+        mesh('Gota',[point(ztop,-.001,-.003),point(ztop,-.001,.003),
+                     point(ztip,-.0005),point((ztop+ztip)/2,.003)],
+                     [(0,1,3),(1,2,3),(2,0,3),(0,2,1)],'Wax')
+    beam('Mecha',(0,0,top-.003),(0,0,top+.005),.002,.002,'Wick')
+    # Seis lados, base y punta: lágrima inclinada.
+    verts=[(.006*math.cos(i*math.pi/3),.006*math.sin(i*math.pi/3),top+.011) for i in range(6)]
+    verts += [(0,0,top+.003),(.003*math.sin(variant),0,height)]
+    mesh('Llama',verts,[(i,(i+1)%6,7) for i in range(6)]+[(i,6,(i+1)%6) for i in range(6)],'Flame')
+
+
+def ceiling_tile_fallen():
+    outline=[(-.3,-.3),(.3,-.3),(.3,.19),(.24,.18),(.20,.24),(.13,.30),(-.3,.3)]
+    o=prism('Loseta rota',outline,.002,.025,'Ceiling_Tile')
+    for v in o.data.vertices: v.co.z += .005*(v.co.x/.3)*(v.co.y/.3)
+    # Grieta: surco geométrico oscuro, usa la misma paleta.
+    mesh('Grieta',[(-.13,-.30,.026),(-.124,-.30,.026),(-.03,-.04,.027),(-.036,-.04,.027),(.14,.07,.028),(.145,.064,.028)],[(0,1,2,3),(3,2,5,4)],'Beige_Dark')
+
+
+def flashlight():
+    z=.0235
+    lathe('Cuerpo',[(.013,-.08),(.014,-.075),(.014,.019),(.019,.027),(.0235,.063),(.0235,.077)],'Dark_Plastic',8,(0,0,z),'X')
+    for x in (-.064,-.037,-.01):
+        lathe('Anillo agarre',[(.014,x),(.0155,x+.002),(.014,x+.004)],'Metal_Grey',6,(0,0,z),'X',False)
+    lathe('Aro frontal',[(.0235,.073),(.0235,.082),(.018,.079)],'Metal_Grey',8,(0,0,z),'X',False)
+    mesh('Lente',[(.080,.018*math.cos(i*math.pi/4),z+.018*math.sin(i*math.pi/4)) for i in range(8)],[tuple(range(8))],'Glow')
+    box('Interruptor',(-.016,0,z+.014),(.026,.013,.006),'Metal_Grey')
+    lathe('Tapón',[(.014,-.078),(.014,-.083)],'Metal_Grey',8,(0,0,z),'X')
+    pts=[(-.081,.005*math.cos(i*math.pi/3),z+.005*math.sin(i*math.pi/3)) for i in range(7)]
+    tube('Anilla',pts,.0015,'Metal_Grey',3)
+
+
+def letter_n():
+    # Contorno continuo, visto desde -Y: diagonal de arriba izquierda a abajo derecha.
+    outline=[(-.25,-.31),(-.25,.31),(-.14,.31),(.14,-.10),(.14,.31),(.25,.31),(.25,-.31),(.14,-.31),(-.14,.10),(-.14,-.31)]
+    bevel(prism('N sólida',outline,-.05,.05,'Glow','Y'),.006)
+
+
+def chair_tipped():
+    chair_office()
+    rotation=Matrix.Rotation(math.pi/2,3,'Y')
+    for o in bpy.context.scene.objects:
+        for v in o.data.vertices: v.co=rotation @ v.co
+    verts=[v.co for o in bpy.context.scene.objects for v in o.data.vertices]
+    low=min(v.z for v in verts)
+    centre=(min(v.x for v in verts)+max(v.x for v in verts))/2
+    for o in bpy.context.scene.objects:
+        for v in o.data.vertices: v.co -= Vector((centre,0,low))
+
+
+BUILDERS={name:globals()[name] for name in SPECS if name in globals()}
+BUILDERS.update(sign_wall=lambda:sign_plate(.62,.2),sign_hanging=lambda:sign_hanging(),sign_wall_right=lambda:sign_plate(.62,.2,1),sign_wall_left=lambda:sign_plate(.62,.2,-1))
+BUILDERS.update(reception_desk=lambda:reception_modern(3.4),reception_wing=lambda:reception_modern(1.25,.65))
+BUILDERS.update(reception_counter=lambda:reception(),reception_small=lambda:reception(1.7,.7,1.),
+                candle_short=lambda:candle(.07,.06,0),candle_mid=lambda:candle(.13,.068,1),candle_tall=lambda:candle(.20,.075,2))
+
+
+def clear():
+    bpy.ops.object.select_all(action='SELECT')
+    bpy.ops.object.delete(use_global=False)
+    for m in list(bpy.data.meshes):
+        if m.users==0: bpy.data.meshes.remove(m)
+
+
+def sign_arrow(center_x, direction, y):
+    # Flecha en relieve (2 mm) que apunta a +X (direction=1) o -X (direction=-1), vista de frente.
+    shape=[(-.06,-.012),(0,-.012),(0,-.036),(.052,0),(0,.036),(0,.012),(-.06,.012)]
+    outline=[(center_x+direction*x,z) for x,z in shape]
+    if direction<0: outline.reverse()
+    prism('Flecha',outline,y-.002,y,'Dark_Plastic','Y')
+
+
+def sign_plate(w,h,arrow=0):
+    # Letrero de pared: marco biselado, placa clara y dos tornillos vistos. El texto lo pone el juego.
+    frame('Marco letrero',w,h,w-.03,h-.03,.026,'Metal_Dark')
+    prism('Placa',rect(w-.03,h-.03),-.019,-.017,'Paper','Y')
+    for x in (-w/2+.035,w/2-.035) if not arrow else (-arrow*(w/2-.035),):
+        ring=[(x+.007*math.cos(i*math.pi/3),.007*math.sin(i*math.pi/3)) for i in range(6)]
+        prism('Tornillo',ring,-.022,-.019,'Metal_Grey','Y')
+    if arrow: sign_arrow(arrow*(w/2-.1),arrow,-.019)
+
+
+def sign_wall(): sign_plate(.62,.2)
+
+
+def sign_hanging():
+    # Letrero colgante de dos caras: placa en caja, varillas al techo y rosetas de anclaje.
+    box('Caja',(0,0,0),(.9,.03,.26),'Metal_Dark',.004)
+    for y in (-.0155,.0155):
+        mesh('Cara',[(-.43,y,-.11),(.43,y,-.11),(.43,y,.11),(-.43,y,.11)],[(0,1,2,3) if y<0 else (3,2,1,0)],'Paper')
+    for x in (-.32,.32):
+        box('Varilla',(x,0,.28),(.012,.012,.3),'Metal_Grey')
+        box('Roseta',(x,0,.425),(.05,.05,.01),'Metal_Grey',.002)
+
+
+def place_origin(name):
+    if name in ('wall_clock','painting_frame','plaque','exit_sign','letter_n','door_exit')+SIGNS+CEILING_MODELS: return
+    points=[v.co for o in bpy.context.scene.objects for v in o.data.vertices]
+    offset=Vector(((min(v.x for v in points)+max(v.x for v in points))/2,
+                   (min(v.y for v in points)+max(v.y for v in points))/2,min(v.z for v in points)))
+    for o in bpy.context.scene.objects:
+        for v in o.data.vertices: v.co-=offset
+
+
+def validate(name):
+    objects=list(bpy.context.scene.objects)
+    points=[o.matrix_world @ v.co for o in objects for v in o.data.vertices]
+    size=tuple(max(v[i] for v in points)-min(v[i] for v in points) for i in range(3))
+    tris=0; names=set()
+    for o in objects:
+        o.data.calc_loop_triangles(); tris+=len(o.data.loop_triangles)
+        names.update(m.name for m in o.data.materials)
+        assert not o.modifiers and o.type=='MESH'
+        assert all(not p.use_smooth for p in o.data.polygons)
+    expected,budget=SPECS[name]
+    checked=size
+    # Comprobar también el cuerpo nominal cuando hay apéndices intencionales.
+    body_filters={'mug':lambda o:o.name.startswith('Taza'),
+                  'partition_panel':lambda o:not o.name.startswith('Pie'),
+                  'box_cardboard_open':lambda o:not o.name.startswith('Solapa')}
+    if name in body_filters:
+        body=[v.co for o in objects if body_filters[name](o) for v in o.data.vertices]
+        checked=tuple(max(v[i] for v in body)-min(v[i] for v in body) for i in range(3))
+        print(f'BODY {name}: {tuple(round(v,4) for v in checked)} m; nominal={expected}',flush=True)
+    print(f'MODEL {name}: {tris}/{budget} tris; bbox={tuple(round(v,4) for v in size)} m; materials={sorted(names)}',flush=True)
+    if names-set(PALETTE): raise ValueError(f'{name}: materiales fuera de paleta')
+    if tris>budget: raise ValueError(f'{name}: presupuesto excedido ({tris}>{budget})')
+    if any(abs(a-b)/b>.15 for a,b in zip(checked,expected)):
+        raise ValueError(f'{name}: dimensiones {checked}, esperadas {expected}')
+    floor=min(v.z for v in points)
+    if name not in ('wall_clock','painting_frame','plaque','exit_sign','letter_n')+SIGNS+CEILING_MODELS and abs(floor)>.008:
+        raise ValueError(f'{name}: no descansa sobre el suelo ({floor})')
+    return tris
+
+
+def main():
+    names=sys.argv[sys.argv.index('--')+1:] if '--' in sys.argv else list(SPECS)
+    unknown=set(names)-set(BUILDERS)
+    if unknown: raise ValueError(f'Modelos desconocidos: {sorted(unknown)}')
+    bpy.context.scene.unit_settings.system='METRIC'
+    bpy.context.scene.unit_settings.scale_length=1
+    out=ROOT/'assets/models'; out.mkdir(parents=True,exist_ok=True)
+    errors=[]
+    for name in names:
+        clear(); BUILDERS[name](); place_origin(name)
+        try: validate(name)
+        except ValueError as error:
+            errors.append(str(error))
+            print(f'ERROR: {error}',flush=True)
+            continue
+        bpy.ops.object.select_all(action='SELECT')
+        bpy.ops.object.transform_apply(location=True,rotation=True,scale=True)
+        bpy.ops.export_scene.gltf(filepath=str(out/f'{name}.glb'),export_format='GLB',export_apply=True,
+            export_yup=True,use_selection=True,export_materials='EXPORT',export_normals=True,export_texcoords=True,
+            export_animations=False,export_cameras=False,export_lights=False)
+    if errors: raise ValueError('\n'.join(errors))
+    print(f'OK: {len(names)} modelos exportados.',flush=True)
+
+
+if __name__=='__main__':
+    try: main()
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)

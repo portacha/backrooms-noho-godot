@@ -26,7 +26,7 @@ El uso de cualquiera de los siguientes elementos de estas wikis obliga irrevocab
 - Entidades con nombre propio (tales como **Smilers** o **Partygoers**).
 - Grupos y facciones del "lore" (como la organización **M.E.G.**).
 
-Publicar un producto comercial bajo esta licencia significa otorgar permiso legal a cualquier tercero para **copiar, redistribuir e incluso vender el juego modificado**, lo cual entraría en un conflicto catastrófico con la protección de la marca registrada NOHO y los intereses comerciales del ecosistema **lovenoho.com**.
+Publicar un producto comercial bajo esta licencia significa otorgar permiso legal a cualquier tercero para **copiar, redistribuir e incluso vender el juego modificado**, lo cual entraría en un conflicto catastrófico con la protección de la marca registrada NOHO y los intereses comerciales del ecosistema **NOHO**.
 
 ## Solución estratégica: canon original
 

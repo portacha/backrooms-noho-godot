@@ -21,7 +21,20 @@ Sin embargo, al combinar modelos primitivos Low Poly con **iluminación horneada
 
 ## Adquisición de activos por categoría
 
-### 1. Ambientación corporativa (prólogo y primeros niveles) — bibliotecas externas
+### Criterio de elección: importancia y visibilidad
+
+**Enmienda 2026-10-09, decisión del usuario**: los objetos importantes, narrativos,
+interactivos o muy visibles se modelan a medida en Blender; para utilería secundaria,
+incidental o de relleno se buscan assets de stock primero. La categoría del objeto
+no basta: una silla protagonista se modela, una silla de fondo puede ser stock.
+Importar stock mediante Blender MCP sigue siendo adquisición de stock.
+
+El procedimiento operativo, las fuentes verificadas de **modelos y texturas**, los
+límites de acceso API/MCP y las descargas de prueba están en
+[16 — Assets de stock y metodología para agentes](16-assets-stock.md).
+Ese documento complementa estas reglas y las licencias de `docs/01`.
+
+### 1. Ambientación corporativa secundaria — bibliotecas externas
 
 Se aprovecharán bibliotecas externas de modelos libres y de bajo costo como **poly.pizza**, orientando las búsquedas a través de términos descriptivos en inglés:
 
@@ -92,3 +105,10 @@ Estos audios se someterán a **compresión y alteración de tono fuera del motor
 | Audio (ambiente, foley, estática) | **Sonniss**, **Freesound.org** | Royalty-free; en Freesound solo CC0 / CC BY |
 
 Todo asset externo se registra en `assets/CREDITS.md` (ver `docs/01`).
+
+Para texturas repetibles secundarias, comenzar por **ambientCG** y **Poly Haven**
+(CC0); alternativa: **3DTextures**. Para modelos secundarios low poly, añadir
+**Kenney** a las fuentes anteriores. Las APIs oficiales de Poly Haven y ambientCG
+se usan con `tools/assets/stock_assets.py`; revisar ficha/licencia vigente, descargar
+a staging y adaptar a la paleta y al límite de materiales antes de integrar.
+Recetas y evidencia de acceso en [docs/16](16-assets-stock.md).

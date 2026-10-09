@@ -4,11 +4,12 @@ Guía de navegación para agentes que trabajan en este proyecto. Lee este archiv
 
 ## Qué es este proyecto
 
-Videojuego de **terror psicológico y escape en primera persona** — *Backrooms NOHO* — construido en **Godot 4.7 / GDScript 2.0**, con exportación a **Web (HTML5/WebAssembly)** y **Android**. Fusión de horror liminal ("Backrooms") × estética del **Día de Muertos mexicano** (Mictlán). Es un *advergame* de la marca **NOHO / lovenoho.com**: el jugador (un oficinista) cae por un cuadro corporativo a pasillos infinitos y debe recolectar las letras **N-O-H-O** para escapar.
+Videojuego de **terror psicológico y escape en primera persona** — *Backrooms NOHO* — construido en **Godot 4.7 / GDScript 2.0**, con exportación a **Web (HTML5/WebAssembly)** y **Android**. Fusión de horror liminal ("Backrooms") × estética del **Día de Muertos mexicano** (Mictlán). Es un *advergame* de la marca **NOHO** (sitio: lovenoho.com): el jugador (un oficinista) cae por un cuadro corporativo a pasillos infinitos y debe recolectar las letras **N-O-H-O** para escapar.
 
 - Fuente de la investigación original: `investigacion.txt` (no editar; es el documento de origen). Los `docs/` marcados como **"Enmendado"** recogen decisiones posteriores y **prevalecen** sobre `investigacion.txt` donde difieran.
 - Motor esperado: Godot 4.7.x (local: `godot`, en `~/.local/bin/godot`; 4.7.2 estable).
-- Estado actual: **fase de diseño** — existe un proyecto base (`project.godot` + `scenes/main.tscn`, una habitación de prueba en renderer Compatibility) sin jugabilidad; la documentación define todo antes de implementar. La raíz del repositorio es la raíz del proyecto Godot.
+- Estado actual: **prólogo y Nivel 1 jugables** (menú → prólogo → caída → Nivel 1 → letra N). Niveles 2–4 y El Olvidado, pendientes. Qué hay construido y cómo se reconstruye: `docs/15`. La raíz del repositorio es la raíz del proyecto Godot.
+- Dirección de arte vigente: la oficina (prólogo) es **tipo la serie *Severance***; los backrooms conservan su estética clásica; **la marca NOHO vive en las oficinas y el menú, nunca dentro de los backrooms** (las letras-altar son mecánica, no marca).
 
 ## Mapa de documentación (`docs/`)
 
@@ -30,9 +31,12 @@ Los archivos `00`–`09` se destilan de `investigacion.txt` y son **normativos**
 | Archivo | Contenido | Cuándo leerlo |
 |---|---|---|
 | [docs/10-high-concept.md](docs/10-high-concept.md) | **High Concept**: pitch, pilares de diseño, arco afectivo, bucle de juego, USP, guardas de alcance y riesgos | Siempre, al empezar cualquier tarea de diseño (historia, niveles, game experience) |
-| [docs/11-historia-y-guion.md](docs/11-historia-y-guion.md) | **Historia y guion**: tesis, temas, voces narrativas, mito de El Olvidado, bóveda de 16 documentos con textos de producción, guion del final (gafete lovenoho.com) | Escribir lore, documentos encontrados, diálogos, cinemáticas o textos de pantallas |
+| [docs/11-historia-y-guion.md](docs/11-historia-y-guion.md) | **Historia y guion**: tesis, temas, voces narrativas, mito de El Olvidado, bóveda de 16 documentos con textos de producción, guion del final (gafete NOHO) | Escribir lore, documentos encontrados, diálogos, cinemáticas o textos de pantallas |
 | [docs/12-dinamica-de-niveles.md](docs/12-dinamica-de-niveles.md) | **Dinámica de niveles**: bucles micro/tramo/nivel, economía (resistencia, linterna, ruido), **niveles de dificultad (Fácil casual / Intermedio / Difícil core)**, sistema de estímulos para la FSM, tramos y ritmo, presupuesto de apariciones, fail states, checkpoints y matriz de ajuste | Implementar gameplay, nivel, IA, pacing, balance o ajuste de dificultad |
 | [docs/13-game-experience.md](docs/13-game-experience.md) | **Game experience**: game feel (linterna como lenguaje, respiración, interacción), cámara y confort, HUD mínimo, menús y pantallas de resolución, muerte/reintento <8 s, accesibilidad (leyendas de sonido, vibración, opciones), guion de sensación del final y orden de implementación | Implementar UI/HUD, menús, feedback, accesibilidad o polish de sensación |
+| [docs/14-prologo.md](docs/14-prologo.md) | **Diseño del prólogo**: plano y zonas, guía por luz y bloqueos diegéticos, guion de tramos, el cuadro (cambio fuera de encuadre, mirada sostenida de 3 s), secuencia de la caída, audio, materiales, encuadres compartidos con menú y final, orden de implementación | Implementar o modificar `scenes/levels/prologue.tscn`, la interacción con documentos, la transición al Nivel 1 o el fondo del menú |
+| [docs/15-implementacion.md](docs/15-implementacion.md) | **Implementación**: qué es jugable, horneado de luz en colores de vértice (`tools/build_levels.gd`), mapa del código, pruebas automáticas, desviaciones respecto al diseño y pendientes | Siempre, antes de tocar código, niveles o herramientas |
+| [docs/16-assets-stock.md](docs/16-assets-stock.md) | **Adquisición de modelos y texturas**: decisión por importancia/visibilidad, fuentes y licencias verificadas, API/MCP, descargador CC0, staging, adaptación y procedencia | Antes de buscar, descargar, modelar o incorporar recursos para ambientación |
 
 ## Reglas duras (no negociables)
 
@@ -42,9 +46,18 @@ Los archivos `00`–`09` se destilan de `investigacion.txt` y son **normativos**
 4. **Render**: renderer **Compatibility** bloqueado para Web+Android. Iluminación estática horneada con `LightmapGI` por sector; **única luz en tiempo real: la linterna** (parpadeos y luces de emergencia por emisión, shader y `Environment`). Visibilidad por **sectores** + niebla; `OccluderInstance3D` es opcional y solo sirve en Android (no funciona en las plantillas Web por defecto). Máx. 6 materiales por nivel. Geometría mutante solo mediante variantes de sector pre-horneadas y pasillos en bucle. Ver `docs/07`.
 5. **Export Web**: **un solo hilo** (*Thread Support* desactivado), sin cabeceras COOP/COEP. No activar hilos ni GDExtensions. Como el audio Web va en modo *Sample*, **todo el audio es pre-renderizado**: prohibido depender de `AudioEffect` en buses, reverberación del motor o audio procedural. Ver `docs/07` y `docs/09`.
 6. **Horror sin combate**: el jugador **no pelea** — camina, corre (resistencia), ilumina, interactúa; agacharse y ocultarse son automáticos, sin botón. Jump scares **racionados** (máx. uno guionizado por nivel + la captura), nunca baratos ni constantes; sin sobreexponer al monstruo, sin explicar la dimensión. Ver `docs/01` y `docs/03`.
-7. **Marca**: solo NOHO, sin anuncios de terceros. En partida, solo integración **diegética**; en menú y pantallas de resolución, presencia **mínima y no bloqueante** con los colores del logotipo (azul, blanco, naranja) como acento; esos colores no tiñen la estética del juego (`docs/02`). Nada retrasa "Jugar" ni "Reintentar". Ver `docs/06`.
+7. **Marca**: solo NOHO, sin anuncios de terceros. El nombre es siempre **NOHO** (nunca "LOVENOHO" ni "NOHO Love"); `lovenoho.com` se escribe únicamente como URL. En partida, solo integración **diegética**; en menú y pantallas de resolución, presencia **mínima y no bloqueante** con los colores del logotipo (azul, blanco, naranja) como acento; esos colores no tiñen la estética del juego (`docs/02`). Nada retrasa "Jugar" ni "Reintentar". Ver `docs/06`.
 8. **Presupuesto de assets**: estética Low Poly, binario idealmente **< 100 MB**. Solo licencias CC0, CC BY o comerciales royalty-free (nunca SA/NC/ND); cada asset externo se registra en `assets/CREDITS.md`. Ver `docs/09` y `docs/01`.
 9. **Controles**: móvil = `VirtualJoystick` (`JOYSTICK_DYNAMIC`, izquierda) + `InputEventScreenDrag` (derecha) + `TouchScreenButton` en `CanvasLayer`; web = WASD + Shift/F/E via `InputMap` + `Input.set_mouse_mode(MOUSE_MODE_CAPTURED)`. Mismas acciones (`sprint`, `flashlight`, `interact`) en ambas plataformas. Ver `docs/03`.
+10. **Objetos modelados, no primitivas**: todo objeto que se añada a una escena (mobiliario, utilería, objetos interactivos, letras, veladoras) se **modela en low-poly** — con Blender por script (`tools/blender/build_models.py` → `assets/models/*.glb`) o la herramienta que resulte más fácil — con silueta, biseles y piezas reconocibles. **Prohibido resolver un objeto con un cubo, una esfera o un cilindro sueltos**, ni en las definiciones de nivel ni en código (`BoxMesh`, `SphereMesh`, CSG). Las primitivas solo valen para arquitectura (muros, suelos, techos) y para superficies que de verdad son planas (una hoja de papel, una pantalla, un lienzo). Las referencias visuales (p. ej. *Severance* para la oficina) son de **estética** —paleta, materiales, luz, época—, no para copiar sus decorados.
+
+## Selección de recursos para ambientación
+
+- **Objetos importantes o muy visibles: modelado propio en Blender**, mediante MCP o script reproducible. Incluye objetivos, piezas narrativas, interacción y primeros planos destacados.
+- **Objetos secundarios, incidentales o de relleno: buscar stock primero**. Adaptar solo cuando encaje con la estética y el presupuesto. Importar stock con Blender MCP sigue siendo stock; el conector disponible no decide la autoría.
+- Para texturas secundarias, priorizar ambientCG y Poly Haven; para mobiliario secundario low poly, Kenney y Poly Pizza mediante acceso oficial habilitado. Detalles narrativos y marca: diseño propio.
+- Seguir [docs/16](docs/16-assets-stock.md) y [tools/assets/README.md](tools/assets/README.md). Descargar a staging; revisar licencia y procedencia; nunca incorporar packs enteros automáticamente. Las rutas de API CC0 probadas están en `tools/assets/stock_assets.py`.
+- Registrar cada recurso integrado y sus modificaciones en `assets/CREDITS.md` en el mismo cambio; conservar evidencia de licencia y hashes. Respetar las restricciones de publicación de fuentes comerciales.
 
 ## Skills instalados (`.agents/skills/`)
 
@@ -99,6 +112,8 @@ Actualizar con: `npx skills update` (desde la raíz del repositorio).
 ```bash
 godot --editor --path .           # abrir el proyecto en el editor de Godot 4.7
 godot --path .                    # ejecutar el proyecto
+godot --headless --path . --script res://tools/build_levels.gd   # regenerar la geometría horneada tras tocar tools/levels/*_def.gd
+godot --headless --path . res://tools/debug/playthrough.tscn      # prueba de punta a punta (menú → Nivel 1)
 npx skills experimental_install   # restaurar skills desde skills-lock.json
 npx skills ls                     # listar skills instalados del proyecto
 npx skills find <query>           # buscar más skills en el ecosistema

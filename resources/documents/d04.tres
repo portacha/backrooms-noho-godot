@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="DocumentData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/interaction/document_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"D04"
+medium = 0
+file_name = ""
+voice = 0
+heading = "Evaluación de desempeño — Semestre 04"
+body = "El colaborador mantiene estándares aceptables de puntualidad. Se recomienda reducir sus ausencias \"para recordar a los que ya no están\".
+Estatus de continuidad: vigente.
+Nombre: [ilegible — manchado de cera]."
+signature = ""

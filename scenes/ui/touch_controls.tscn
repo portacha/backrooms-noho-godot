@@ -1,0 +1,37 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/touch_controls.gd" id="1_touch"]
+
+[sub_resource type="CircleShape2D" id="Circle_play"]
+radius = 48.0
+
+[node name="TouchControls" type="CanvasLayer"]
+layer = 10
+script = ExtResource("1_touch")
+
+[node name="Joystick" type="VirtualJoystick" parent="."]
+anchor_right = 0.5
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+joystick_mode = 1
+visibility_mode = 1
+joystick_size = 200.0
+tip_size = 90.0
+deadzone_ratio = 0.2
+action_up = &"move_forward"
+action_down = &"move_back"
+action_left = &"move_left"
+action_right = &"move_right"
+
+[node name="SprintButton" type="TouchScreenButton" parent="."]
+position = Vector2(968, 600)
+action = "sprint"
+shape = SubResource("Circle_play")
+shape_visible = false
+
+[node name="FlashButton" type="TouchScreenButton" parent="."]
+position = Vector2(1080, 600)
+action = "flashlight"
+shape = SubResource("Circle_play")
+shape_visible = false

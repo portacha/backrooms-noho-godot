@@ -27,7 +27,7 @@ Toda la historia —documentos, altares, final— cuelga de esta frase. El Día 
 |---|---|---|
 | **El Oficinista** (jugador) | Cualquier empleado. Se quedó solo después de horario frente al cuadro. | **Sin nombre propio en pantalla.** Su identidad solo aparece dañada en documentos (cera, agua, ilegible). No habla, no se ve su rostro |
 | **El Olvidado** | Lo que queda de alguien que esperó una ofrenda que nunca llegó. Ver §6 | Nunca se nombra en los documentos; nunca se le da nombre propio. Se le describe por lo que le falta |
-| **NOHO / lovenoho.com** | La marca como entidad que **recuerda**. No es dios ni demonio: es un sistema que conserva nombres | Solo habla en documentos corporativos, placas y neón. Nunca explica, siempre invita |
+| **NOHO** | La marca como entidad que **recuerda**. No es dios ni demonio: es un sistema que conserva nombres | Solo habla en documentos corporativos, placas y neón. Nunca explica, siempre invita |
 
 No hay cuarto personaje. **Nunca aparece otro humano vivo** (pilar de aislamiento, `docs/01`).
 
@@ -87,7 +87,7 @@ Regla: **se sugiere por acumulación y por ausencia; jamás se declara.**
 
 **D01 — Correo corporativo** *(voz: corporativa)* — Escritorio junto a la sala de juntas.
 > Asunto: instalación de pieza central — sala de juntas
-> El lienzo de la campaña LOVENOHO llegó esta noche. La dirección pide instalarlo fuera de horario laboral y no retirarlo bajo ninguna circunstancia. Si limpieza pregunta, ya está en inventario.
+> El lienzo de la campaña NOHO llegó esta noche. La dirección pide instalarlo fuera de horario laboral y no retirarlo bajo ninguna circunstancia. Si limpieza pregunta, ya está en inventario.
 > — Imagen Corporativa
 
 *Función*: siembra el cuadro como objeto ritual-administrativo.
@@ -200,7 +200,7 @@ Regla: **se sugiere por acumulación y por ausencia; jamás se declara.**
 
 ### Escape — objeto final
 
-**D16 — Gafete de identificación LOVENOHO** *(objeto, no lectura)* — Cuello del protagonista, en la oficina de vuelta.
+**D16 — Gafete de identificación NOHO** *(objeto, no lectura)* — Cuello del protagonista, en la oficina de vuelta.
 > *(logo NOHO en neón · foto con un pétalo de cempasúchil adherido · línea de texto)*
 > COLABORADOR VIGENTE — gracias por volver a casa.
 

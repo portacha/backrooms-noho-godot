@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="DocumentData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/interaction/document_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"D06"
+medium = 3
+file_name = ""
+voice = 2
+heading = ""
+body = "NO LOS JUNTES
+CADA LETRA QUE TOCAS
+TE RECUERDA ALGUNA COSA
+Y ALGO SE ACUERDA DE TI"
+signature = ""

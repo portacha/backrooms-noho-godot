@@ -23,11 +23,15 @@ const BREATH_SILENT_DB: float = -60.0
 
 @export_group("Resistencia")
 @export var max_stamina: float = 100.0
-@export var sprint_drain: float = 20.0
-@export var regen_idle: float = 12.0
-@export var regen_walking: float = 6.0
+## ~8,3 s de carrera continua (antes 5 s): el sprint es huida, no castigo.
+@export var sprint_drain: float = 12.0
+@export var regen_idle: float = 18.0
+@export var regen_walking: float = 9.0
+## Solo el agotamiento real dispara el jadeo fuerte; el cansancio previo avisa suave.
 @export var hyperventilation_threshold: float = 20.0
-@export var hyperventilation_linger: float = 5.0
+@export var hyperventilation_linger: float = 2.5
+## Toques cortos de sprint (< gracia) no consumen: reposicionarse no cansa.
+@export var sprint_grace_seconds: float = 0.8
 ## Perfil Fácil: sin consumo y sin cues de respiración.
 @export var infinite_stamina: bool = false
 
@@ -51,11 +55,26 @@ const BREATH_SILENT_DB: float = -60.0
 
 @export_group("Audio")
 @export var footstep_sounds: Array[AudioStream] = []
-@export var breath_max_db: float = -6.0
+## Mezcla de terror: la respiración vive DEBAJO de pasos/ambiente, nunca encima.
+## -6 dB la ponía como protagonista; -16 dB la deja presente sin enmascarar.
+@export var breath_max_db: float = -16.0
+## Cansancio previo: audible pero íntimo, sin penalizar sigilo.
+@export var breath_tired_db: float = -28.0
+@export var breath_tired_threshold: float = 65.0
+## Fades orgánicos (dB/s): entrada lenta, cola natural. Sin pitch ni filtros
+## (Web = todo pre-renderizado, docs/13 §9): solo automatización de volumen.
+@export var breath_fade_in_db: float = 8.0
+@export var breath_fade_out_db: float = 12.0
 
 var stamina: float = 100.0
 var is_sprinting: bool = false
 var is_hyperventilating: bool = false
+## Falso mientras se lee un documento: sin movimiento, mirada ni interacción.
+var controls_enabled: bool = true:
+	set(value):
+		controls_enabled = value
+		if is_node_ready():
+			interactor.enabled = value
 
 var _pitch: float = 0.0
 var _stride_phase: float = 0.0
@@ -65,15 +84,21 @@ var _linger_left: float = 0.0
 var _last_step_index: int = -1
 var _head_height: float = 0.0
 var _has_move_input: bool = false
+var _sprint_time: float = 0.0
 
 @onready var _head: Node3D = $Head
 @onready var _camera: Camera3D = $Head/Camera3D
 @onready var _footstep_player: AudioStreamPlayer = $FootstepPlayer
 @onready var _breath_player: AudioStreamPlayer = $BreathPlayer
+@onready var interactor: Interactor = $Interactor
+@onready var flashlight: Flashlight = $Head/Camera3D/Flashlight
+@onready var head: Node3D = $Head
+@onready var camera: Camera3D = $Head/Camera3D
 
 
 func _ready() -> void:
 	stamina = max_stamina
+	reduced_camera_motion = reduced_camera_motion or Game.reduced_camera_motion
 	_head_height = _head.position.y
 	_camera.fov = MOBILE_FOV if _is_touch_device() else DESKTOP_FOV
 	_breath_player.volume_db = BREATH_SILENT_DB
@@ -83,9 +108,8 @@ func _ready() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	var captured: bool = Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED
 	if event is InputEventMouseMotion and captured:
-		_look((event as InputEventMouseMotion).relative)
-	elif event.is_action_pressed("ui_cancel"):
-		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+		if controls_enabled:
+			_look((event as InputEventMouseMotion).relative)
 	elif event is InputEventMouseButton and event.is_pressed() and not captured:
 		# En Web el navegador solo concede el bloqueo del puntero tras un clic.
 		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
@@ -93,7 +117,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	var input: Vector2 = Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+	var input: Vector2 = Vector2.ZERO
+	if controls_enabled:
+		input = Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	var direction: Vector3 = (global_basis * Vector3(input.x, 0.0, input.y)).normalized()
 	var moving: bool = not direction.is_zero_approx()
 	_has_move_input = moving
@@ -116,6 +142,38 @@ func _physics_process(delta: float) -> void:
 	_update_breath(delta)
 
 
+## Giro de cámara en píxeles de arrastre. Lo usan el ratón y el arrastre táctil (docs/03).
+func apply_look(relative: Vector2) -> void:
+	if controls_enabled:
+		_look(relative)
+
+
+## Fija la mirada: `yaw` gira el cuerpo y `pitch` la cabeza (radianes).
+func set_view(yaw: float, pitch: float) -> void:
+	rotation.y = yaw
+	_pitch = clampf(pitch, -PITCH_LIMIT, PITCH_LIMIT)
+	_head.rotation.x = _pitch
+
+
+## Acerca la mirada a un punto del mundo; `weight` 0–1 por llamada (docs/14 §6.2).
+func steer_look(target: Vector3, weight: float) -> void:
+	var offset: Vector3 = target - _camera.global_position
+	if offset.is_zero_approx():
+		return
+	var yaw: float = atan2(-offset.x, -offset.z)
+	var pitch: float = atan2(offset.y, Vector2(offset.x, offset.z).length())
+	set_view(lerp_angle(rotation.y, yaw, weight), lerpf(_pitch, pitch, weight))
+
+
+## Cede la cámara y el cuerpo a una secuencia guionizada (la caída, docs/14 §7).
+func set_cutscene(active: bool) -> void:
+	controls_enabled = not active
+	set_physics_process(not active)
+	if active:
+		velocity = Vector3.ZERO
+		_breath_player.stop()
+
+
 func _look(relative: Vector2) -> void:
 	var radians_per_pixel: float = deg_to_rad(mouse_sensitivity)
 	rotate_y(-relative.x * radians_per_pixel)
@@ -136,16 +194,21 @@ func _update_sprint(moving: bool) -> void:
 func _update_stamina(moving: bool, delta: float) -> void:
 	if infinite_stamina:
 		stamina = max_stamina
+		_sprint_time = 0.0
 		_set_hyperventilating(false)
 		return
 
 	if is_sprinting:
-		stamina = maxf(stamina - sprint_drain * delta, 0.0)
+		_sprint_time += delta
+		# Gracia inicial sin consumo: los toques cortos no castigan.
+		if _sprint_time > sprint_grace_seconds:
+			stamina = maxf(stamina - sprint_drain * delta, 0.0)
 	else:
+		_sprint_time = 0.0
 		var regen: float = regen_walking if moving else regen_idle
 		stamina = minf(stamina + regen * delta, max_stamina)
 
-	if stamina < hyperventilation_threshold:
+	if stamina <= hyperventilation_threshold:
 		_linger_left = hyperventilation_linger
 		_set_hyperventilating(true)
 	elif is_hyperventilating and not is_sprinting:
@@ -210,8 +273,17 @@ func _update_camera(delta: float) -> void:
 
 
 func _update_breath(delta: float) -> void:
-	var target_db: float = breath_max_db if is_hyperventilating else BREATH_SILENT_DB
-	var fade_speed: float = 60.0 if is_hyperventilating else 20.0
+	var target_db: float = BREATH_SILENT_DB
+	if is_hyperventilating:
+		# Jadeo fuerte, pero mezclado 10 dB por debajo de antes: presencia sin grito.
+		target_db = breath_max_db
+	elif not infinite_stamina and stamina < breath_tired_threshold and (_has_move_input or is_sprinting):
+		# Cansancio progresivo: de silencio a íntimo (-28 dB) a medida que baja
+		# la resistencia. Avisa al cuerpo antes de penalizar al sigilo.
+		var span: float = breath_tired_threshold - hyperventilation_threshold
+		var tiredness: float = clampf((breath_tired_threshold - stamina) / maxf(span, 1.0), 0.0, 1.0)
+		target_db = lerpf(BREATH_SILENT_DB, breath_tired_db, tiredness)
+	var fade_speed: float = breath_fade_in_db if target_db > _breath_player.volume_db else breath_fade_out_db
 	_breath_player.volume_db = move_toward(_breath_player.volume_db, target_db, fade_speed * delta)
 	var audible: bool = _breath_player.volume_db > BREATH_SILENT_DB + 0.5
 	if audible and not _breath_player.playing:

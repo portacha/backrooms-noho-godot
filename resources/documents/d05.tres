@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="DocumentData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/interaction/document_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"D05"
+medium = 0
+file_name = ""
+voice = 1
+heading = "para la ofrenda:"
+body = "• 2 ramos de cempasúchil
+• veladoras blancas
+• pan de muerto
+• agua, sal, copal
+• una foto (aunque esté borrosa)
+• algo para el que nadie recuerda"
+signature = ""

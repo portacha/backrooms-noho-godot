@@ -81,7 +81,7 @@ En móvil, `TouchScreenButton` de *sprint* y linterna en `CanvasLayer` (siempre 
 - Fondo **diegético**: la oficina del prólogo con el cuadro NOHO (la marca vive aquí, no en partida).
 - **JUGAR** es el botón primario, un toque, siempre visible. Nada lo retrasa (regla de `docs/06`).
 - Debajo: **Dificultad** (selector segmentado de 3, §4.3 de `12`), **Opciones**, **Créditos**.
-- Presencia de marca de alto impacto permitida aquí (lockup LOVENOHO) — es el vehículo publicitario, no el juego.
+- Presencia de marca de alto impacto permitida aquí (lockup NOHO) — es el vehículo publicitario, no el juego.
 
 ### 6.2 Pausa
 - **Pausa real** (single-player offline): la entidad se congela y el audio hace *fade* al 10% en 0,3 s. El horror no castiga a quien necesita atender el mundo real (audiencia casual/móvil).

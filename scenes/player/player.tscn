@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=13 format=3]
 
 [ext_resource type="Script" path="res://scripts/player/player.gd" id="1_script"]
 [ext_resource type="AudioStream" path="res://assets/audio/sfx/footstep_shoe_01.wav" id="2_step"]
@@ -8,6 +8,11 @@
 [ext_resource type="AudioStream" path="res://assets/audio/sfx/footstep_shoe_05.wav" id="6_step"]
 [ext_resource type="AudioStream" path="res://assets/audio/sfx/footstep_shoe_06.wav" id="7_step"]
 [ext_resource type="AudioStream" path="res://assets/audio/sfx/breath_heavy_loop.ogg" id="8_breath"]
+
+[ext_resource type="Script" path="res://scripts/player/interactor.gd" id="9_interactor"]
+
+[ext_resource type="Script" path="res://scripts/player/flashlight.gd" id="10_flashlight"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/flashlight_click.wav" id="11_click"]
 
 [sub_resource type="CapsuleShape3D" id="Capsule"]
 radius = 0.35
@@ -30,8 +35,27 @@ fov = 75.0
 near = 0.05
 far = 60.0
 
+[node name="Flashlight" type="SpotLight3D" parent="Head/Camera3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.18, -0.16, 0)
+visible = false
+light_color = Color(0.86, 0.92, 1, 1)
+light_energy = 2.4
+spot_range = 20.0
+spot_attenuation = 0.7
+spot_angle = 30.0
+spot_angle_attenuation = 1.2
+script = ExtResource("10_flashlight")
+
+[node name="Click" type="AudioStreamPlayer" parent="Head/Camera3D/Flashlight"]
+stream = ExtResource("11_click")
+volume_db = -8.0
+
 [node name="FootstepPlayer" type="AudioStreamPlayer" parent="."]
 
 [node name="BreathPlayer" type="AudioStreamPlayer" parent="."]
 stream = ExtResource("8_breath")
 volume_db = -60.0
+
+[node name="Interactor" type="Node" parent="." node_paths=PackedStringArray("camera")]
+script = ExtResource("9_interactor")
+camera = NodePath("../Head/Camera3D")
