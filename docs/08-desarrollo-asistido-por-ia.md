@@ -33,7 +33,7 @@ Se desplegará la capacidad de razonamiento profundo del modelo para generar las
 
 - El **contrato** del script base abstracto `state.gd`.
 - El **controlador jerárquico** del enrutamiento `state_machine.gd`.
-- Un caso de uso específico como la lógica computacional interna del comportamiento de patrullaje `patrol.gd` correspondiente a un nodo `CharacterBody3D`.
+- Un caso de uso específico como la lógica computacional interna del comportamiento de patrullaje `wander_state.gd` (el `WanderState` de `docs/05`) correspondiente a un nodo `CharacterBody3D`.
 
 ### 2. Codificación contextual y completado analítico con OpenCode / Cursor
 
@@ -53,7 +53,7 @@ En fases avanzadas de pruebas operativas (especialmente en simulaciones de expor
 
 Esta telemetría estructurada se suministrará de vuelta a Claude para solicitar **auditorías de optimización**, permitiendo a la IA sugerir ajustes precisos en:
 
-- La colocación de volúmenes de `OccluderInstance3D`.
+- La división en sectores y, en Android, la colocación de volúmenes de `OccluderInstance3D` (ver `docs/07`).
 - Alteraciones en la escala de resolución para mitigar el consumo de procesamiento.
 
 ## Reglas derivadas para el código generado
@@ -67,3 +67,5 @@ Esta telemetría estructurada se suministrará de vuelta a Claude para solicitar
 | IA | FSM orientada a nodos con `enter()`, `exit()`, `can_exit()` |
 | Acoplamiento | Desacoplar mediante **Signals** hacia capas superiores |
 | Optimización | Alimentar al modelo con datos del Profiler (CPU ms, VRAM, Draw Calls) |
+| Audio | Sin `AudioEffect` en buses ni audio procedural: todo pre-renderizado (el export Web usa el modo *Sample*) |
+| Luces | Ningún `Light3D` en tiempo real salvo el `SpotLight3D` de la linterna |

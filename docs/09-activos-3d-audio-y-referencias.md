@@ -1,6 +1,7 @@
 # Referencias Visuales y Estrategia de Adquisición de Activos Tridimensionales
 
 > Fuente: `investigacion.txt` — sección "Referencias Visuales y Estrategia de Adquisición de Activos Tridimensionales".
+> **Enmendado 2026-10-09**: audio pre-renderizado y ElevenLabs, posprocesado realista para Compatibility, licencias.
 
 ## Objetivo de peso del binario
 
@@ -16,7 +17,7 @@ Para acelerar dramáticamente el ciclo de producción de arte visual, el diseño
 - Modelado con formas geométricas muy **angulares**.
 - Prescindir de texturas fotográficas de alta resolución, empleando superficies de **colores sólidos mate**.
 
-Sin embargo, al combinar modelos primitivos Low Poly con técnicas de **iluminación y posprocesamiento hiperrealistas** generadas por el motor Godot 4.7 (sombras suaves, corrección de color agresiva y **aberración cromática**), se produce un contraste cognitivo conocido como el **"valle inquietante"** (*uncanny valley*), que resulta excepcional para catalizar el horror liminal que requiere la experiencia.
+Sin embargo, al combinar modelos primitivos Low Poly con **iluminación horneada de calidad y un posprocesado cinematográfico** (sombras suaves y rebotes en el lightmap, corrección de color agresiva, resplandor, niebla y **aberración cromática** en momentos puntuales; técnica y límites en `docs/07`), se produce un contraste cognitivo conocido como el **"valle inquietante"** (*uncanny valley*), que resulta excepcional para catalizar el horror liminal que requiere la experiencia.
 
 ## Adquisición de activos por categoría
 
@@ -26,7 +27,7 @@ Se aprovecharán bibliotecas externas de modelos libres y de bajo costo como **p
 
 - "office supplies"
 - "furniture"
-- Colecciones estandarizadas: **"low poly office pack"**, **"POLYGON Office"**
+- Colecciones estandarizadas: **"low poly office pack"**; como alternativa de pago, **"POLYGON Office"** (Synty Store)
 
 Esto facilita el ensamble paramétrico rápido de componentes ambientales mundanos:
 
@@ -47,16 +48,27 @@ Los elementos autóctonos e iconográficos de la festividad demandan un **tratam
 - Estelas decorativas simulando **papel picado** rasgado.
 - **Calaveritas de azúcar** estilizadas.
 
-Alternativamente, iteraciones de alta calidad preparadas para motores de renderizado en tiempo real podrán licenciarse desde repositorios tridimensionales comerciales como **Sketchfab**.
+Alternativamente, iteraciones de alta calidad preparadas para motores de renderizado en tiempo real podrán licenciarse desde repositorios tridimensionales comerciales como **Sketchfab**, revisando la licencia de cada modelo (ver tabla de licencias en `docs/01`).
 
 ### 3. Ambiente acústico — bibliotecas royalty-free
 
 La orquestación del ambiente acústico representa el **pilar crítico de inmersión**, constituyendo **más del cincuenta por ciento del peso psicológico** en el género del terror.
 
-Archivos sonoros de alta pureza **libres de derechos (Royalty-Free)** se extraerán de bibliotecas como:
+Fuentes de audio, por orden de preferencia:
 
-- **Freesound.org**
-- Repositorio industrial de la plataforma **Sonniss**
+- **ElevenLabs** (generación): efectos de sonido a medida y material vocal sin habla — jadeos e hiperventilación del protagonista, respiración y chillido de El Olvidado. Requiere un plan con licencia de uso comercial.
+- **Sonniss** (bibliotecas royalty-free de la industria).
+- **Freesound.org**, solo archivos CC0 o CC BY (la licencia es por archivo; ver `docs/01`).
+
+### Audio pre-renderizado (obligatorio)
+
+El export Web reproduce en modo *Sample*, que **no soporta efectos en tiempo real** (reverberación, distorsión, filtros en buses, doppler, audio procedural). Por tanto:
+
+- Todo efecto se **hornea en el archivo** fuera del motor: eco, reverberación, distorsión, cambio de tono, ralentización.
+- Los sonidos que dependen del espacio se entregan en **variantes por tipo de recinto**: p. ej. pasos en alfombra (seco), en planicie (eco largo), en agua, en conducto.
+- Las variaciones (tono, pequeñas diferencias) se resuelven con **varias tomas** elegidas al azar, no con procesado.
+- En el motor solo se usan volumen, paneo y atenuación por distancia de `AudioStreamPlayer3D`; el audio posicional debe probarse pronto en Web.
+- Formato: OGG Vorbis para ambientes y música; WAV corto para efectos de respuesta inmediata. El audio cuenta para el límite de 100 MB.
 
 Tipos de material bruto a recopilar:
 
@@ -67,13 +79,16 @@ Tipos de material bruto a recopilar:
 | Estática | Ráfagas inestables de estática radiofónica |
 | Mecánica | Distorsiones mecánicas |
 
-Estos audios se someterán a **compresión especializada y alteración de tono espacial**, completando así la arquitectura estética de los pasillos infinitos del Mictlán corporativo, donde el logotipo brillante y pulido de NOHO descansa como el único remanente de civilización y la clave indiscutible de la supervivencia.
+Estos audios se someterán a **compresión y alteración de tono fuera del motor**, completando así la arquitectura estética de los pasillos infinitos del Mictlán corporativo, donde el logotipo brillante y pulido de NOHO descansa como el único remanente de civilización y la clave indiscutible de la supervivencia.
 
 ## Resumen de fuentes de activos
 
 | Activo | Fuente | Licencia / método |
 |---|---|---|
-| Mobiliario oficina (low poly) | poly.pizza ("low poly office pack", "POLYGON Office") | Libres / de bajo costo |
+| Mobiliario oficina (low poly) | poly.pizza ("low poly office pack"); Synty "POLYGON Office" | CC0 / CC BY con créditos; pack de pago |
 | Iconografía Día de Muertos | Modelado propio en **Blender** | Autoral |
-| Alternativa alta calidad 3D | **Sketchfab** | Comercial |
-| Audio (ambiente, foley, estática) | **Freesound.org**, **Sonniss** | Royalty-Free |
+| Alternativa alta calidad 3D | **Sketchfab** | Comercial, licencia por modelo |
+| Audio (efectos, voces) | **ElevenLabs** | Generado; plan con uso comercial |
+| Audio (ambiente, foley, estática) | **Sonniss**, **Freesound.org** | Royalty-free; en Freesound solo CC0 / CC BY |
+
+Todo asset externo se registra en `assets/CREDITS.md` (ver `docs/01`).

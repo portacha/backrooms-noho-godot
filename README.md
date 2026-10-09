@@ -1,4 +1,4 @@
-# NOHO Backrooms Escape
+# Backrooms NOHO
 
 Proyecto base 3D para Godot 4.7.2, basado en `investigacion.txt`.
 
@@ -8,8 +8,8 @@ Importa `project.godot` en Godot y pulsa **F6** para ejecutar la escena abierta
 o **F5** para ejecutar el proyecto. También puedes usar:
 
 ```bash
-godot4 --editor --path .
-godot4 --path .
+godot --editor --path .
+godot --path .
 ```
 
 La escena inicial contiene una habitación de prueba, iluminación, cámara fija

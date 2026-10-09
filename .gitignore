@@ -10,6 +10,8 @@ export_credentials.cfg
 .codex/
 .aws/
 *.bundle
+.env
+.~lock.*#
 
 # Operating system files
 .DS_Store

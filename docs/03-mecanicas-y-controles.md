@@ -1,6 +1,7 @@
 # Mecánicas de Interacción y Sistemas del Jugador
 
 > Fuente: `investigacion.txt` — sección "Mecánicas de Interacción y Sistemas del Jugador".
+> **Enmendado 2026-10-09**: agacharse y ocultarse automáticos; teclas de escritorio para correr, linterna e interactuar.
 
 ## Principio de diseño
 
@@ -24,9 +25,17 @@ Para situaciones de peligro inminente, el jugador dispone de una mecánica de **
 
 La resistencia se **regenera de forma pasiva únicamente** cuando el jugador se detiene o vuelve a caminar lentamente.
 
+### Agacharse y ocultarse (automáticos)
+
+No existen botones de agacharse ni de esconderse. El juego sigue teniendo solo cuatro verbos (caminar, correr, iluminar, interactuar); el entorno hace el resto:
+
+- **Agacharse**: al entrar en un espacio bajo (conductos de ventilación, huecos bajo un escritorio u ofrenda), un `Area3D` baja la cámara y la cápsula de colisión, reduce la velocidad y desactiva el sprint. Al salir, el personaje se incorpora solo en cuanto hay altura libre.
+- **Ocultarse**: el jugador se considera oculto cuando está **quieto, con la linterna apagada, dentro de una zona de escondite** (nicho, conducto, sombra marcada por diseño de nivel). Estar oculto reduce su radio de detección visual y sonoro. No hay animación ni indicador explícito: se comunica con el sonido de la respiración contenida.
+- Quedarse oculto demasiado tiempo activa la emboscada de El Olvidado (`AmbushState`, ver `docs/05`).
+
 ## Linterna
 
-La gestión de la linterna es la **herramienta principal de supervivencia y exploración**. A diferencia de mecánicas punitivas que obligan a recolectar baterías, la linterna del jugador **no posee una carga finita**.
+La gestión de la linterna es la **herramienta principal de supervivencia y exploración**. A diferencia de mecánicas punitivas que obligan a recolectar baterías, la linterna del jugador **no posee una carga finita**: no hay baterías que recolectar ni indicador de carga. El jugador puede encenderla y apagarla a voluntad.
 
 Sin embargo, su confiabilidad está directamente ligada a la **proximidad de la anomalía**: cuando el monstruo se acerca, el **campo electromagnético** de la entidad causa que la linterna:
 
@@ -45,7 +54,11 @@ Para la implementación técnica de los sistemas de control táctil en dispositi
 | Desplazamiento Espacial | Dispositivos Móviles (Android) | Nodo `VirtualJoystick` instanciado en el lado izquierdo de la pantalla. Configurado bajo el modo `JOYSTICK_DYNAMIC`, lo que permite que el control direccional aparezca dinámicamente en el punto exacto donde el pulgar del usuario entra en contacto con la pantalla. |
 | Rotación de Cámara | Dispositivos Móviles (Android) | Intercepción de eventos de entrada `InputEventScreenDrag` restringidos lógicamente a la mitad derecha del espacio en pantalla, mapeados a la rotación del cuello del personaje (`Camera3D`). |
 | Acciones (Correr, Linterna) | Dispositivos Móviles (Android) | Nodos nativos `TouchScreenButton` superpuestos mediante una jerarquía `CanvasLayer` para asegurar que siempre se rendericen por encima de la geometría 3D del juego. |
+| Interactuar | Dispositivos Móviles (Android) | Toque sobre el indicador central cuando está expandido (ver "Interacción por proximidad"). |
 | Movimiento y Mirada | Navegador Web (PC/Mac) | Interfaz clásica de teclado (W, A, S, D) configurada a través del `InputMap` del motor. El cursor se oculta e intercepta utilizando el comando `Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)`. |
+| Acciones | Navegador Web (PC/Mac) | Acciones del `InputMap`: `sprint` = Shift, `flashlight` = F o clic derecho, `interact` = E o clic izquierdo. |
+
+Las mismas acciones del `InputMap` (`sprint`, `flashlight`, `interact`) las disparan los `TouchScreenButton` en móvil, de modo que el código del jugador no distingue plataforma.
 
 ## Interacción por proximidad
 

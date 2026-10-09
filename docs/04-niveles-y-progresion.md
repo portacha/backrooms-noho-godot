@@ -1,6 +1,7 @@
 # Progresión Narrativa y Diseño de Niveles
 
 > Fuente: `investigacion.txt` — sección "Progresión Narrativa y Diseño de Niveles".
+> **Enmendado 2026-10-09**: agacharse automático, linterna sin batería, remansos de veladoras, técnica de los niveles abiertos.
 
 ## Estructura general
 
@@ -13,6 +14,8 @@ La arquitectura del juego se segmenta en una **secuencia introductoria o prólog
 | 2 | "Las Ofrendas Infinitas" | **O** | Planicies brutalistas + ofrendas monumentales |
 | 3 | "El Pasaje de las Calaveras" | **H** | Conductos inundados + calaveras fosforescentes |
 | 4 | "El Umbral del Mictlán" | **O** (segunda) | Caverna abisal + islas flotantes de oficina |
+
+Cada nivel incluye 2–3 **remansos de veladoras** (zonas pequeñas de luz cálida donde la entidad no ataca; ver `docs/02`) y 3–5 **mutaciones de geometría** (ver `docs/07`). Su colocación exacta se define en `docs/12`.
 
 ---
 
@@ -33,19 +36,19 @@ La estética rinde tributo a las iteraciones clásicas de los espacios liminales
 Para integrar la temática mexicana, el jugador notará **acumulaciones de un polvo naranja brillante** en los rincones de las habitaciones que, tras una inspección cercana, revelan ser **pétalos de cempasúchil deshidratados**.
 
 - **Topografía**: diseñada para romper las líneas de visión constantemente, impidiendo que el jugador vea más allá de un par de metros de distancia.
-- **Amenaza**: la entidad aún **no se manifiesta en forma corpórea**, pero el terror se infunde mediante un diseño de audio adaptativo, donde el motor de juego genera **sonidos de pasos esporádicos** que imitan la cadencia de la caminata del jugador, originándose desde habitaciones adyacentes.
+- **Amenaza**: la entidad aún **no se manifiesta en forma corpórea** (no se instancia; en este nivel no se puede morir), pero el terror se infunde mediante un diseño de audio adaptativo, donde el motor de juego genera **sonidos de pasos esporádicos** que imitan la cadencia de la caminata del jugador, originándose desde habitaciones adyacentes.
 - **Objetivo**: la letra **"N"** yace en una **sala central anómala**, flotando a centímetros de la superficie de un **escritorio de recepción** completamente ahogado bajo el peso de cientos de **veladoras de cera derretidas**.
 
 ---
 
 ## Nivel 2 — "Las Ofrendas Infinitas" (letra **O**)
 
-Tras una perturbación visual, la arquitectura del laberinto **se expande agresivamente**: los pasillos estrechos dan paso a **colosales planicies interiores** sostenidas por **columnas de concreto brutalista**.
+Tras una perturbación visual, la arquitectura del laberinto **se expande agresivamente**: los pasillos estrechos dan paso a **colosales planicies interiores** sostenidas por **columnas de concreto brutalista**. La escala se sugiere con oscuridad y niebla: el jugador nunca ve más allá de unas decenas de metros (ver `docs/07`).
 
 El papel tapiz comienza a desprenderse de las estructuras, revelando **cimientos precolombinos de adobe oscuro y piedra volcánica**. En medio del vacío corporativo, surgen **ofrendas monumentales del Día de Muertos** incrustadas violentamente dentro de los cubículos de oficina.
 
 - **Atmósfera olfativa sugerida**: la humedad se reemplaza por el denso **humo del incienso de copal** y la **estática del ozono**.
-- **Amenaza — primera manifestación visual de la entidad**: se materializa en la lejanía. Si el jugador comete el error de **iluminar a la criatura directamente** con el foco central de la linterna, esta emitirá un **chillido compuesto por estática de baja frecuencia** y desaparecerá instantáneamente, solo para **reaparecer geométricamente más cerca** del jugador tras el próximo parpadeo de luz. → Mecánica de **evitación de contacto visual**.
+- **Amenaza — primera manifestación visual de la entidad**: se materializa en la lejanía. Si el jugador comete el error de **iluminar a la criatura directamente** con el foco central de la linterna, esta emitirá un **chillido compuesto por estática de baja frecuencia** y desaparecerá instantáneamente, solo para **reaparecer geométricamente más cerca** del jugador tras el próximo parpadeo de luz. → Mecánica de **evitación de iluminación directa** (en la FSM: `AmbushState`, ver `docs/05`). El chillido es el jump scare guionizado de este nivel.
 - **Objetivo**: la letra **"O"** descansa en la cúspide de una **ofrenda piramidal de tres niveles** construida con **archiveros corporativos de metal oxidado**.
 
 ---
@@ -58,7 +61,7 @@ La superficie del agua está cubierta casi en su totalidad por una **alfombra de
 
 - **Amenaza**: la entidad asume un rol de **cazador activo**.
 - **Mecánica del agua**: penaliza severamente el sonido. Correr genera **salpicaduras estridentes** que atraen de inmediato al monstruo → transición hacia jugabilidad de **sigilo**.
-- **Jugabilidad**: obliga al jugador a **agacharse**, navegar por **conductos de ventilación laterales** e interpretar la cercanía de la entidad a través de las **fallas intermitentes en la batería de su linterna**.
+- **Jugabilidad**: el jugador navega por **conductos de ventilación laterales**, donde se **agacha automáticamente** y puede ocultarse (ver `docs/03`), e interpreta la cercanía de la entidad a través de las **fallas intermitentes de su linterna**.
 - **Objetivo**: la letra **"H"** se encuentra al final del pasaje principal, resguardada detrás de una **pared perimetral esculpida enteramente en barro negro oaxaqueño**.
 
 ---
@@ -75,7 +78,7 @@ Requiere que el jugador localice la segunda letra "O" para desbloquear la salida
 
 Estas islas están interconectadas por **puentes precarios** formados por interminables **tiras de papel picado translúcido**.
 
-- **Diseño geométrico**: plataformas muy simples y caminos estrechos que requieren concentración para no caer al vacío. Caer resulta en un **bucle que teletransporta** al jugador de regreso al inicio del puente.
+- **Diseño geométrico**: plataformas muy simples y caminos estrechos que requieren concentración para no caer al vacío. El ancho mínimo de los puentes se calibra para el joystick táctil; la dificultad viene de la presión, no de la precisión. Caer resulta en un **bucle que teletransporta** al jugador de regreso al inicio del puente.
 - **Clímax**: al interactuar con la última letra, la entidad se enfurece. El entorno sufre **fallas sistémicas**, con **luces rojas de emergencia** bañando el vacío y el diseño sonoro alcanzando un clímax ensordecedor.
 - **Escape**: el jugador debe emplear su resistencia restante para **correr desesperadamente** a través del vacío colapsante hacia una **puerta monumental de madera de roble antiguo**, sobre la cual brilla un espectacular y refulgente **letrero de neón magenta** con el nombre completo **"NOHO"**.
 - **Final**: atravesar esta puerta **silencia de golpe** el entorno, devolviendo al jugador a la oficina inicial frente al cuadro, revelando que el personaje porta ahora un **accesorio comercial de lovenoho.com**, seguido de un desvanecimiento a negro.
