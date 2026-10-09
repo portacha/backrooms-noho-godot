@@ -1,0 +1,16 @@
+# Godot generated cache and exported builds
+.godot/
+builds/
+export_credentials.cfg
+*.tmp
+
+# Local tooling and repository backups
+.agents/
+.claude/
+.codex/
+.aws/
+*.bundle
+
+# Operating system files
+.DS_Store
+Thumbs.db
