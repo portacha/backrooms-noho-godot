@@ -1,0 +1,271 @@
+[gd_scene load_steps=11 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="1_player"]
+[ext_resource type="AudioStream" path="res://assets/audio/ambient/office_hum_loop.ogg" id="2_hum"]
+
+[sub_resource type="Environment" id="Env"]
+background_mode = 1
+background_color = Color(0.02, 0.025, 0.03, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.55, 0.62, 0.72, 1)
+ambient_light_energy = 0.55
+fog_enabled = true
+fog_light_color = Color(0.03, 0.04, 0.05, 1)
+fog_density = 0.06
+
+[sub_resource type="StandardMaterial3D" id="MatFloor"]
+albedo_color = Color(0.2, 0.21, 0.23, 1)
+roughness = 1.0
+
+[sub_resource type="StandardMaterial3D" id="MatWall"]
+albedo_color = Color(0.62, 0.63, 0.64, 1)
+roughness = 1.0
+
+[sub_resource type="StandardMaterial3D" id="MatPartition"]
+albedo_color = Color(0.36, 0.39, 0.43, 1)
+roughness = 1.0
+
+[sub_resource type="StandardMaterial3D" id="MatDesk"]
+albedo_color = Color(0.5, 0.47, 0.42, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="MatMonitor"]
+albedo_color = Color(0.05, 0.06, 0.08, 1)
+emission_enabled = true
+emission = Color(0.6, 0.78, 1, 1)
+emission_energy_multiplier = 2.0
+
+[sub_resource type="StandardMaterial3D" id="MatPainting"]
+albedo_color = Color(1, 0.45, 0.05, 1)
+emission_enabled = true
+emission = Color(1, 0.45, 0.05, 1)
+emission_energy_multiplier = 1.5
+
+[sub_resource type="StandardMaterial3D" id="MatPaintingBlue"]
+albedo_color = Color(0.05, 0.3, 0.85, 1)
+emission_enabled = true
+emission = Color(0.05, 0.3, 0.85, 1)
+emission_energy_multiplier = 1.5
+
+[node name="Prologue" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Env")
+
+[node name="Ambience" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("2_hum")
+volume_db = -8.0
+autoplay = true
+
+[node name="Player" parent="." instance=ExtResource("1_player")]
+position = Vector3(0, 0, 10.5)
+sprint_enabled = false
+
+[node name="Office" type="Node3D" parent="."]
+
+[node name="Floor" type="CSGBox3D" parent="Office"]
+position = Vector3(0, -0.1, 0)
+use_collision = true
+size = Vector3(14, 0.2, 24)
+material = SubResource("MatFloor")
+
+[node name="Ceiling" type="CSGBox3D" parent="Office"]
+position = Vector3(0, 3.1, 0)
+use_collision = true
+size = Vector3(14, 0.2, 24)
+material = SubResource("MatWall")
+
+[node name="WallWest" type="CSGBox3D" parent="Office"]
+position = Vector3(-7.1, 1.5, 0)
+use_collision = true
+size = Vector3(0.2, 3, 24)
+material = SubResource("MatWall")
+
+[node name="WallEast" type="CSGBox3D" parent="Office"]
+position = Vector3(7.1, 1.5, 0)
+use_collision = true
+size = Vector3(0.2, 3, 24)
+material = SubResource("MatWall")
+
+[node name="WallSouth" type="CSGBox3D" parent="Office"]
+position = Vector3(0, 1.5, 12.1)
+use_collision = true
+size = Vector3(14.4, 3, 0.2)
+material = SubResource("MatWall")
+
+[node name="WallNorthLeft" type="CSGBox3D" parent="Office"]
+position = Vector3(-4.1, 1.5, -12.1)
+use_collision = true
+size = Vector3(6.2, 3, 0.2)
+material = SubResource("MatWall")
+
+[node name="WallNorthRight" type="CSGBox3D" parent="Office"]
+position = Vector3(4.1, 1.5, -12.1)
+use_collision = true
+size = Vector3(6.2, 3, 0.2)
+material = SubResource("MatWall")
+
+[node name="DoorLintel" type="CSGBox3D" parent="Office"]
+position = Vector3(0, 2.6, -12.1)
+use_collision = true
+size = Vector3(2, 0.8, 0.2)
+material = SubResource("MatWall")
+
+[node name="Cubicles" type="Node3D" parent="."]
+
+[node name="PartitionL1" type="CSGBox3D" parent="Cubicles"]
+position = Vector3(-4.25, 0.75, 6)
+use_collision = true
+size = Vector3(5.5, 1.5, 0.1)
+material = SubResource("MatPartition")
+
+[node name="PartitionL2" type="CSGBox3D" parent="Cubicles"]
+position = Vector3(-4.25, 0.75, 2)
+use_collision = true
+size = Vector3(5.5, 1.5, 0.1)
+material = SubResource("MatPartition")
+
+[node name="PartitionL3" type="CSGBox3D" parent="Cubicles"]
+position = Vector3(-4.25, 0.75, -2)
+use_collision = true
+size = Vector3(5.5, 1.5, 0.1)
+material = SubResource("MatPartition")
+
+[node name="PartitionL4" type="CSGBox3D" parent="Cubicles"]
+position = Vector3(-4.25, 0.75, -6)
+use_collision = true
+size = Vector3(5.5, 1.5, 0.1)
+material = SubResource("MatPartition")
+
+[node name="PartitionR1" type="CSGBox3D" parent="Cubicles"]
+position = Vector3(4.25, 0.75, 6)
+use_collision = true
+size = Vector3(5.5, 1.5, 0.1)
+material = SubResource("MatPartition")
+
+[node name="PartitionR2" type="CSGBox3D" parent="Cubicles"]
+position = Vector3(4.25, 0.75, 2)
+use_collision = true
+size = Vector3(5.5, 1.5, 0.1)
+material = SubResource("MatPartition")
+
+[node name="PartitionR3" type="CSGBox3D" parent="Cubicles"]
+position = Vector3(4.25, 0.75, -2)
+use_collision = true
+size = Vector3(5.5, 1.5, 0.1)
+material = SubResource("MatPartition")
+
+[node name="PartitionR4" type="CSGBox3D" parent="Cubicles"]
+position = Vector3(4.25, 0.75, -6)
+use_collision = true
+size = Vector3(5.5, 1.5, 0.1)
+material = SubResource("MatPartition")
+
+[node name="AisleBlocker" type="CSGBox3D" parent="Cubicles"]
+position = Vector3(-1.55, 0.75, 0)
+use_collision = true
+size = Vector3(6.1, 1.5, 0.1)
+material = SubResource("MatPartition")
+
+[node name="DeskL1" type="CSGBox3D" parent="Cubicles"]
+position = Vector3(-6.4, 0.375, 4)
+use_collision = true
+size = Vector3(0.8, 0.75, 1.8)
+material = SubResource("MatDesk")
+
+[node name="MonitorL1" type="CSGBox3D" parent="Cubicles"]
+position = Vector3(-6.6, 1, 4)
+size = Vector3(0.05, 0.36, 0.6)
+material = SubResource("MatMonitor")
+
+[node name="DeskL3" type="CSGBox3D" parent="Cubicles"]
+position = Vector3(-6.4, 0.375, -4)
+use_collision = true
+size = Vector3(0.8, 0.75, 1.8)
+material = SubResource("MatDesk")
+
+[node name="MonitorL3" type="CSGBox3D" parent="Cubicles"]
+position = Vector3(-6.6, 1, -4)
+size = Vector3(0.05, 0.36, 0.6)
+material = SubResource("MatMonitor")
+
+[node name="DeskR1" type="CSGBox3D" parent="Cubicles"]
+position = Vector3(6.4, 0.375, 4)
+use_collision = true
+size = Vector3(0.8, 0.75, 1.8)
+material = SubResource("MatDesk")
+
+[node name="MonitorR1" type="CSGBox3D" parent="Cubicles"]
+position = Vector3(6.6, 1, 4)
+size = Vector3(0.05, 0.36, 0.6)
+material = SubResource("MatMonitor")
+
+[node name="DeskR2" type="CSGBox3D" parent="Cubicles"]
+position = Vector3(6.4, 0.375, 0)
+use_collision = true
+size = Vector3(0.8, 0.75, 1.8)
+material = SubResource("MatDesk")
+
+[node name="MonitorR2" type="CSGBox3D" parent="Cubicles"]
+position = Vector3(6.6, 1, 0)
+size = Vector3(0.05, 0.36, 0.6)
+material = SubResource("MatMonitor")
+
+[node name="DeskR3" type="CSGBox3D" parent="Cubicles"]
+position = Vector3(6.4, 0.375, -4)
+use_collision = true
+size = Vector3(0.8, 0.75, 1.8)
+material = SubResource("MatDesk")
+
+[node name="MonitorR3" type="CSGBox3D" parent="Cubicles"]
+position = Vector3(6.6, 1, -4)
+size = Vector3(0.05, 0.36, 0.6)
+material = SubResource("MatMonitor")
+
+[node name="Boardroom" type="Node3D" parent="."]
+
+[node name="Floor" type="CSGBox3D" parent="Boardroom"]
+position = Vector3(0, -0.1, -16.2)
+use_collision = true
+size = Vector3(8, 0.2, 8)
+material = SubResource("MatFloor")
+
+[node name="Ceiling" type="CSGBox3D" parent="Boardroom"]
+position = Vector3(0, 3.1, -16.2)
+use_collision = true
+size = Vector3(8, 0.2, 8)
+material = SubResource("MatWall")
+
+[node name="WallWest" type="CSGBox3D" parent="Boardroom"]
+position = Vector3(-4.1, 1.5, -16.2)
+use_collision = true
+size = Vector3(0.2, 3, 8)
+material = SubResource("MatWall")
+
+[node name="WallEast" type="CSGBox3D" parent="Boardroom"]
+position = Vector3(4.1, 1.5, -16.2)
+use_collision = true
+size = Vector3(0.2, 3, 8)
+material = SubResource("MatWall")
+
+[node name="WallNorth" type="CSGBox3D" parent="Boardroom"]
+position = Vector3(0, 1.5, -20.3)
+use_collision = true
+size = Vector3(8.4, 3, 0.2)
+material = SubResource("MatWall")
+
+[node name="Table" type="CSGBox3D" parent="Boardroom"]
+position = Vector3(0, 0.375, -15.5)
+use_collision = true
+size = Vector3(1.4, 0.75, 3.6)
+material = SubResource("MatDesk")
+
+[node name="Painting" type="CSGBox3D" parent="Boardroom"]
+position = Vector3(0, 1.6, -20.15)
+size = Vector3(3.2, 1.9, 0.06)
+material = SubResource("MatPainting")
+
+[node name="PaintingAccent" type="CSGBox3D" parent="Boardroom"]
+position = Vector3(-0.7, 1.6, -20.1)
+size = Vector3(1, 1.2, 0.04)
+material = SubResource("MatPaintingBlue")
