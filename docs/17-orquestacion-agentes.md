@@ -78,3 +78,9 @@ tools/agents/launch.sh <codex|opencode> <modelo> <id-encargo>     # en segundo p
 4. Volver a ejecutar **yo** sus pruebas y el playthrough; mirar capturas y hojas de contacto.
 5. Si un encargo quedó a medias: relanzarlo con un encargo corto de corrección (`NNb-…`), no reescribirlo a mano salvo que sea trivial.
 6. Solo entonces lanzar la ola siguiente.
+
+## 8. Cuando un agente se corta a medias (cuota, caída)
+
+`codex` tiene límite de uso por ventana: al agotarse, **todos** los `codex exec` en marcha mueren a la vez con `EXIT 1` y el mensaje `You've hit your usage limit … try again at HH:MM` al final del registro (pasó el 2026-10-09 con seis encargos abiertos). No lanzar más de 3–4 encargos largos de codex a la vez, y repartir el resto en `opencode-go/*`, que va por otra suscripción.
+
+Para retomar sin perder lo hecho: un encargo corto de **continuación** `NNc-<nombre>.md` que apunta al original, manda leer las últimas ~400 líneas del registro anterior y el estado en disco, mantiene los mismos archivos propios y exige la misma verificación. Se lanza con otro modelo (`opencode-go/gpt-6-luna`, `muse-spark-1.3-contributor`, `mimo-v2.6-pro`). En tareas con gasto externo (Meshy, ElevenLabs, OpenAI) la continuación debe leer primero el libro de gastos (`builds/meshy/ledger.json`) y **recuperar las tareas ya pagadas** en lugar de crearlas otra vez.
