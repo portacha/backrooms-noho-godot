@@ -1,0 +1,72 @@
+[gd_scene load_steps=11 format=3]
+
+[ext_resource type="Script" path="res://scripts/entity/olvidado.gd" id="entity"]
+
+[ext_resource type="Script" path="res://scripts/entity/entity_state_machine.gd" id="machine"]
+
+[ext_resource type="Script" path="res://scripts/entity/states/wander_state.gd" id="wander"]
+
+[ext_resource type="Script" path="res://scripts/entity/states/investigate_state.gd" id="investigate"]
+
+[ext_resource type="Script" path="res://scripts/entity/states/chase_state.gd" id="chase"]
+
+[ext_resource type="Script" path="res://scripts/entity/states/ambush_state.gd" id="ambush"]
+
+[ext_resource type="Script" path="res://scripts/entity/states/attack_state.gd" id="attack"]
+
+[sub_resource type="CapsuleShape3D" id="capsule"]
+radius = 0.35
+height = 2.5
+[sub_resource type="QuadMesh" id="petal"]
+size = Vector2(0.025, 0.045)
+[sub_resource type="StandardMaterial3D" id="petal_material"]
+albedo_color = Color(0.3, 0.12, 0.025, 1)
+shading_mode = 0
+
+[node name="Olvidado" type="CharacterBody3D"]
+script = ExtResource("entity")
+collision_layer = 4
+collision_mask = 1
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+position = Vector3(0, 1.25, 0)
+shape = SubResource("capsule")
+[node name="Model" type="Node3D" parent="."]
+rotation = Vector3(0, 3.14159265, 0)
+[node name="NavigationAgent3D" type="NavigationAgent3D" parent="."]
+radius = 0.4
+path_desired_distance = 0.2
+target_desired_distance = 0.35
+[node name="Sight" type="RayCast3D" parent="."]
+position = Vector3(0, 2.2, 0)
+collision_mask = 1
+[node name="Steps" type="AudioStreamPlayer3D" parent="."]
+volume_db = -12.0
+max_distance = 25.0
+[node name="Breath" type="AudioStreamPlayer3D" parent="."]
+volume_db = -20.0
+max_distance = 18.0
+[node name="Voice" type="AudioStreamPlayer3D" parent="."]
+volume_db = -10.0
+max_distance = 35.0
+[node name="Petals" type="CPUParticles3D" parent="."]
+position = Vector3(0, 2.25, -0.12)
+amount = 12
+lifetime = 2.0
+mesh = SubResource("petal")
+material_override = SubResource("petal_material")
+direction = Vector3(0, -1, 0)
+gravity = Vector3(0, -0.6, 0)
+initial_velocity_min = 0.1
+initial_velocity_max = 0.2
+[node name="StateMachine" type="Node" parent="."]
+script = ExtResource("machine")
+[node name="WanderState" type="Node" parent="StateMachine"]
+script = ExtResource("wander")
+[node name="InvestigateState" type="Node" parent="StateMachine"]
+script = ExtResource("investigate")
+[node name="ChaseState" type="Node" parent="StateMachine"]
+script = ExtResource("chase")
+[node name="AmbushState" type="Node" parent="StateMachine"]
+script = ExtResource("ambush")
+[node name="AttackState" type="Node" parent="StateMachine"]
+script = ExtResource("attack")
