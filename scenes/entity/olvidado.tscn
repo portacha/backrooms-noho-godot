@@ -31,7 +31,6 @@ collision_mask = 1
 position = Vector3(0, 1.25, 0)
 shape = SubResource("capsule")
 [node name="Model" type="Node3D" parent="."]
-rotation = Vector3(0, 3.14159265, 0)
 [node name="NavigationAgent3D" type="NavigationAgent3D" parent="."]
 radius = 0.4
 path_desired_distance = 0.2

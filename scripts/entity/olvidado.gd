@@ -40,6 +40,14 @@ var _listen_left: float = -1.0
 var _phase: float = 0.0
 var _step_distance: float = 0.0
 var _parts: Dictionary[String, Node3D] = {}
+var _animation_player: AnimationPlayer
+var _skeleton: Skeleton3D
+var _clips: Dictionary[StringName, StringName] = {}
+var _clip: StringName = &""
+var _attack_visual_time: float = 0.0
+var _scream_left: float = 0.0
+var _clip_speeds: Dictionary = {}
+@onready var _petals: CPUParticles3D = $Petals
 @onready var agent: NavigationAgent3D = $NavigationAgent3D
 @onready var sight: RayCast3D = $Sight
 @onready var machine: EntityStateMachine = $StateMachine
@@ -74,6 +82,8 @@ func setup(player: Player, geo: Node3D, screen_fx: ScreenFx = null) -> void:
 		_prepare_model()
 	for part: Node in model.find_children("*", "Node3D", true, false):
 		_parts[String(part.name)] = part as Node3D
+	if not screeched.is_connected(_visual_scream):
+		screeched.connect(_visual_scream)
 	if profile.starts_hidden:
 		vanish()
 	else:
@@ -86,6 +96,13 @@ func _prepare_model() -> void:
 	material.shader = SURFACE
 	for node: Node in model.find_children("*", "MeshInstance3D", true, false):
 		var instance: MeshInstance3D = node as MeshInstance3D
+		var textured: BaseMaterial3D = instance.get_active_material(0) as BaseMaterial3D
+		if textured != null and textured.albedo_texture != null:
+			material.set_shader_parameter("use_texture", true)
+			material.set_shader_parameter("albedo_texture", textured.albedo_texture)
+			instance.material_override = material
+			instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			continue
 		var merged: ArrayMesh = ArrayMesh.new()
 		for index: int in instance.mesh.get_surface_count():
 			var arrays: Array = instance.mesh.surface_get_arrays(index)
@@ -99,6 +116,56 @@ func _prepare_model() -> void:
 		instance.mesh = merged
 		instance.material_override = material
 		instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_prepare_animation()
+
+func _prepare_animation() -> void:
+	model.rotation.y = PI
+	var players: Array[Node] = model.find_children("*", "AnimationPlayer", true, false)
+	if players.is_empty():
+		return
+	_animation_player = players[0] as AnimationPlayer
+	for name: StringName in _animation_player.get_animation_list():
+		var short_name: StringName = StringName(String(name).get_file())
+		if short_name in [&"idle", &"walk", &"search", &"run", &"attack", &"scream"]:
+			_clips[short_name] = name
+			var animation: Animation = _animation_player.get_animation(name)
+			animation.loop_mode = Animation.LOOP_LINEAR if short_name in [&"idle", &"walk", &"search", &"run"] else Animation.LOOP_NONE
+	# El GLB adaptado ya mira a -Z; el respaldo conserva su giro original.
+	if _clips.size() != 6:
+		_animation_player = null
+		return
+	model.rotation = Vector3.ZERO
+	if FileAccess.file_exists("res://scripts/entity/olvidado_motion.json"):
+		var data: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://scripts/entity/olvidado_motion.json"))
+		if data is Dictionary:
+			_clip_speeds = data
+	var skeletons: Array[Node] = model.find_children("*", "Skeleton3D", true, false)
+	if not skeletons.is_empty():
+		_skeleton = skeletons[0] as Skeleton3D
+		for index: int in _skeleton.get_bone_count():
+			if String(_skeleton.get_bone_name(index)).to_lower().ends_with("head"):
+				var attachment: BoneAttachment3D = BoneAttachment3D.new()
+				attachment.name = "PetalHead"
+				_skeleton.add_child(attachment)
+				attachment.bone_name = _skeleton.get_bone_name(index)
+				_petals.reparent(attachment, false)
+				var head_frame: Transform3D = _skeleton.global_transform * _skeleton.get_bone_global_pose(index)
+				_petals.position = head_frame.basis.inverse() * global_basis * Vector3(0, 0.12, -0.08)
+				_petals.scale = Vector3.ONE / head_frame.basis.get_scale()
+				break
+	_play_clip(&"idle")
+
+func _play_clip(name: StringName, rate: float = 1.0) -> void:
+	if _animation_player == null or not _clips.has(name):
+		return
+	if _clip != name:
+		_clip = name
+		_animation_player.play(_clips[name], 0.25)
+	_animation_player.speed_scale = rate
+
+func _visual_scream() -> void:
+	_scream_left = 0.7
+	_play_clip(&"scream")
 
 func _exit_tree() -> void:
 	for channel: AudioStreamPlayer3D in [steps, breath, voice]:
@@ -144,7 +211,7 @@ func vanish() -> void:
 	breath.stop()
 	voice.stop()
 	$CollisionShape3D.set_deferred("disabled", true)
-	$Petals.emitting = false
+	_petals.emitting = false
 
 func teleport_to(at: Vector3) -> void:
 	if forbidden(at):
@@ -156,7 +223,7 @@ func teleport_to(at: Vector3) -> void:
 	active = true
 	manifested = false
 	$CollisionShape3D.set_deferred("disabled", false)
-	$Petals.emitting = true
+	_petals.emitting = true
 	agent.target_position = at
 	play_audio(breath, "breath_loop.ogg")
 	relocated.emit(at)
@@ -389,6 +456,7 @@ func play_audio(channel: AudioStreamPlayer3D, file: String) -> void:
 		channel.play()
 
 func _state_changed(state: StringName) -> void:
+	_attack_visual_time = 0.0
 	state_changed.emit(state)
 	match state:
 		&"Wander": Game.caption("[huesos secos — lejos]")
@@ -401,6 +469,29 @@ func _state_changed(state: StringName) -> void:
 		voice.stop()
 
 func animate(delta: float) -> void:
+	if _animation_player != null:
+		var pace: float = Vector2(velocity.x, velocity.z).length()
+		var name: StringName = &"idle"
+		var rate: float = 1.0
+		if current_state() == &"Attack":
+			_attack_visual_time += delta
+			name = &"attack" if _attack_visual_time < 0.75 else &"scream"
+			rate = _animation_player.get_animation(_clips[name]).length / 0.75
+		elif _scream_left > 0.0:
+			_scream_left -= delta
+			name = &"scream"
+		elif current_state() == &"Investigate":
+			name = &"search"
+		elif pace > 0.05 and not manifested:
+			name = &"run" if current_state() == &"Chase" else &"walk"
+		if name in [&"walk", &"run", &"search"]:
+			# Metros por segundo del clip, medidos en la adaptación, no dificultad.
+			var native_pace: float = float(_clip_speeds.get(String(name), 1.0))
+			rate = pace / maxf(native_pace, 0.01)
+			if name == &"search" and pace < 0.05:
+				rate = 0.35
+		_play_clip(name, rate)
+		return
 	_phase += delta * maxf(velocity.length(), 0.3) * 2.0
 	for key: String in ["ArmUpper_L", "ArmUpper_R", "LegUpper_L", "LegUpper_R"]:
 		if _parts.has(key):

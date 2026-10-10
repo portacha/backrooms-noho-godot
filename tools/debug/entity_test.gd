@@ -55,12 +55,25 @@ func _run() -> void:
 	entity.screeched.connect(func() -> void: screams += 1)
 	entity.relocated.connect(func(_at: Vector3) -> void: relocations += 1)
 	entity.caught_player.connect(func() -> void: captures += 1)
+	if OS.get_environment("ENTITY_SHOTS") == "1":
+		await _capture_views()
+		return
 	var body_materials: Dictionary[int, bool] = {}
 	for node: Node in entity.model.find_children("*", "MeshInstance3D", true, false):
 		var mesh: MeshInstance3D = node as MeshInstance3D
 		body_materials[mesh.material_override.get_instance_id()] = true
 	check(body_materials.size() == 1, "modelo usa un solo material compartido")
 	await frames(20)
+	check(entity._animation_player != null, "modelo con AnimationPlayer")
+	for clip: StringName in [&"idle", &"walk", &"search", &"run", &"attack", &"scream"]:
+		check(entity._clips.has(clip), "existe clip " + String(clip))
+	# La malla de navegación puede tardar varios frames en publicar su primer destino.
+	var walk_wait: int = 0
+	while entity._clip != &"walk" and walk_wait < 120:
+		await frames(1)
+		walk_wait += 1
+	check(entity._clip == &"walk", "Wander reproduce walk")
+	check(entity.model.find_children("PetalHead", "BoneAttachment3D", true, false).size() == 1, "pétalos siguen cabeza")
 	var start: Vector3 = entity.global_position
 	await frames(120)
 	check(entity.global_position.distance_to(start) > 0.5, "patrulla se desplaza")
@@ -71,11 +84,14 @@ func _run() -> void:
 	player.footstep.emit(Game.difficulty.noise_sprint)
 	await frames(2)
 	check(entity.current_state() == &"Investigate", "ruido cercano → Investigate")
+	check(entity._clip == &"search", "Investigate reproduce search")
 	entity.face(player.global_position)
 	entity.add_stimulus(100, player.global_position)
 	var before: float = entity.global_position.distance_to(player.global_position)
 	await frames(20)
 	check(entity.current_state() == &"Chase", "LOS + estímulo → Chase")
+	check(entity._clip == &"run", "Chase reproduce run")
+	check(entity._animation_player == null or entity._animation_player.speed_scale > 0.0, "reproducción ligada al desplazamiento")
 	check(entity.global_position.distance_to(player.global_position) < before - 0.5, "persecución se acerca")
 	entity.manifest_at(Vector3(9, 0, 9), false)
 	player.global_position = Vector3(15, 0, 9)
@@ -112,6 +128,7 @@ func _run() -> void:
 	player.flashlight.turn(false)
 	await frames(3)
 	check(screams == 0 and entity.current_state() == &"Wander", "vistazo breve seguro")
+	check(entity._clip == &"idle", "manifestación quieta reproduce idle")
 	player.flashlight.turn(true)
 	player.steer_look(entity.global_position + Vector3(0, 2.25, 6), 1.0)
 	await frames(90)
@@ -154,9 +171,12 @@ func _run() -> void:
 	entity.manifest_at(player.global_position + Vector3(1, 0, 0))
 	await frames(2)
 	check(entity.current_state() == &"Attack", "distancia <1,5 m → Attack")
+	check(entity._clip == &"attack", "Attack reproduce attack")
 	entity.force_state(&"Wander")
 	check(entity.current_state() == &"Attack", "Attack terminal")
-	await frames(120)
+	await frames(48)
+	check(entity._clip == &"scream", "Attack termina con scream")
+	await frames(72)
 	check(captures == 1, "captura emite caught_player una vez")
 	check(not player.controls_enabled, "captura toma cámara")
 	check(is_equal_approx(screen_fx.fade, 1.0), "captura termina en negro")
@@ -173,3 +193,42 @@ func _run() -> void:
 	geo.queue_free()
 	await frames(3)
 	get_tree().quit(result)
+
+func _capture_views() -> void:
+	# Misma arena y linterna del jugador; ninguna luz auxiliar.
+	entity.manifest_at(Vector3(19, 0, 5))
+	entity.set_physics_process(false)
+	entity.set_process(false)
+	player.set_physics_process(false)
+	player.flashlight.available = true
+	player.flashlight.set_threat(INF, false)
+	var environment: WorldEnvironment = WorldEnvironment.new()
+	environment.environment = Environment.new()
+	environment.environment.background_mode = Environment.BG_COLOR
+	environment.environment.background_color = Color(0.015, 0.015, 0.012)
+	environment.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	environment.environment.ambient_light_color = Color.BLACK
+	add_child(environment)
+	for distance: float in [4.0, 12.0, -12.0]:
+		var lit: bool = distance > 0.0
+		player.global_position = Vector3(19, 0, 5 + absf(distance))
+		entity.face(player.global_position)
+		player.steer_look(entity.global_position + Vector3.UP * 1.3, 1.0)
+		player.flashlight.turn(lit)
+		screen_fx.fade = 0.0
+		await frames(30)
+		await RenderingServer.frame_post_draw
+		var label: String = "%dm" % int(distance) if lit else "silhouette"
+		var path: String = "res://builds/meshy/olvidado/ingame_%s.png" % label
+		var result: Error = get_viewport().get_texture().get_image().save_png(path)
+		check(result == OK, "captura " + label)
+		print("ENTITY SHOT ", path, " result=", result)
+	print("ENTITY SHOTS OK" if errors.is_empty() else "ENTITY SHOTS FAIL")
+	for audio: Node in find_children("*", "AudioStreamPlayer", true, false) + find_children("*", "AudioStreamPlayer3D", true, false):
+		audio.call("stop")
+		audio.set("stream", null)
+	await frames(6)
+	for child: Node in get_children():
+		child.queue_free()
+	await frames(3)
+	get_tree().quit(0 if errors.is_empty() else 1)
