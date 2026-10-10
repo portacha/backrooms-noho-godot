@@ -15,6 +15,7 @@ class SurfaceData:
 	var indices: PackedInt32Array = PackedInt32Array()
 	var cells: PackedInt32Array = PackedInt32Array()
 	var kinds: PackedByteArray = PackedByteArray()
+	var chunks: PackedInt32Array = PackedInt32Array()
 	func arrays() -> Array:
 		var result: Array = []
 		result.resize(Mesh.ARRAY_MAX)
@@ -46,6 +47,11 @@ var _marker_counts: Dictionary[String, int] = {}
 const PALETTE_MATERIAL: StringName = &"flat"
 const PALETTE_SIZE: int = 32
 var _palette: Array[Color] = []
+var _nav_obstacles: Array[AABB] = []
+var _material_cache: Dictionary[StringName, ShaderMaterial] = {}
+var _object_cell: int = -1
+var _variable_heights: bool = false
+var _max_height: float = 0.0
 var _palette_uv: Vector2 = Vector2(-1.0, -1.0)
 
 static func build(def: LevelDef) -> Node3D:
@@ -77,6 +83,9 @@ func _build(def: LevelDef) -> Node3D:
 				# Un diccionario definido vacío sigue siendo una celda abierta.
 				tile["_defined"] = true
 			_grid.append(tile)
+			if _open(tile):
+				_variable_heights = _variable_heights or not is_equal_approx(_cell_height(tile), def.wall_height)
+				_max_height = maxf(_max_height, _cell_height(tile))
 	_floor_sum.resize(_grid.size())
 	_floor_sum.fill(Color(0, 0, 0, 0))
 	_floor_count.resize(_grid.size())
@@ -93,23 +102,35 @@ func _build(def: LevelDef) -> Node3D:
 	for marker: String in def.markers:
 		_add_marker(marker, def.markers[marker])
 	_merge_collision()
-	var size: Vector3 = Vector3(_width * def.cell_size, 0.2, _height * def.cell_size)
-	_shape(size, Vector3(size.x * 0.5, -0.1, size.z * 0.5))
-	_shape(size, Vector3(size.x * 0.5, def.wall_height + 0.1, size.z * 0.5))
+	if def.open_void:
+		_merge_slabs("floor")
+		_merge_slabs("ceiling")
+	else:
+		var size: Vector3 = Vector3(_width * def.cell_size, 0.2, _height * def.cell_size)
+		_shape(size, Vector3(size.x * 0.5, -0.1, size.z * 0.5))
+		if _variable_heights:
+			_merge_slabs("ceiling", true)
+		else:
+			_shape(size, Vector3(size.x * 0.5, def.wall_height + 0.1, size.z * 0.5))
 	_bake()
-	var mesh: ArrayMesh = ArrayMesh.new()
 	var vertex_count: int = 0
 	for key: StringName in _surfaces:
-		var data: SurfaceData = _surfaces[key]
-		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, data.arrays())
-		mesh.surface_set_material(mesh.get_surface_count() - 1, _material(key))
-		mesh.surface_set_name(mesh.get_surface_count() - 1, String(key))
-		vertex_count += data.positions.size()
-	var geometry: MeshInstance3D = MeshInstance3D.new()
-	geometry.name = "Geometry"
-	geometry.mesh = mesh
-	_attach(_root, geometry)
-	_emit_panels()
+		vertex_count += _surfaces[key].positions.size()
+	if def.chunk_cells > 0:
+		_emit_chunks()
+	else:
+		var mesh: ArrayMesh = ArrayMesh.new()
+		for key: StringName in _surfaces:
+			var data: SurfaceData = _surfaces[key]
+			mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, data.arrays())
+			mesh.surface_set_material(mesh.get_surface_count() - 1, _shared_material(key))
+			mesh.surface_set_name(mesh.get_surface_count() - 1, String(key))
+		var geometry: MeshInstance3D = MeshInstance3D.new()
+		geometry.name = "Geometry"
+		geometry.mesh = mesh
+		_attach(_root, geometry)
+		_emit_panels()
+	_navigation_meta()
 	_root.set_meta("lights", _lights)
 	_root.set_meta("cell_size", def.cell_size)
 	_root.set_meta("rows", def.rows)
@@ -120,9 +141,55 @@ func _validate() -> bool:
 	if _def == null or _def.name.is_empty() or _def.name.validate_filename() != _def.name:
 		push_error("LevelDef: nombre inválido.")
 		return false
-	if _def.rows.is_empty() or _def.cell_size <= 0.0 or _def.wall_height <= DOOR_HEIGHT:
+	if _def.rows.is_empty() or not _positive(_def.cell_size) or not _positive(_def.wall_height):
 		push_error("LevelDef: mapa vacío o dimensiones inválidas.")
 		return false
+	if _def.chunk_cells < 0 or not is_finite(_def.visibility_range) or _def.visibility_range < 0.0 or not _positive(_def.void_skirt_depth):
+		push_error("LevelDef: bloques, visibilidad o grosor inválidos.")
+		return false
+	for symbol: Variant in _def.tiles:
+		if not symbol is String or not _def.tiles[symbol] is Dictionary:
+			push_error("LevelDef: tile inválido.")
+			return false
+		var tile: Dictionary = _def.tiles[symbol]
+		if (tile.has("height") and not _number(tile["height"])) or not _positive(_cell_height(tile)) or (bool(tile.get("door", false)) and _cell_height(tile) < DOOR_HEIGHT):
+			push_error("LevelDef: altura de tile inválida.")
+			return false
+		for key: String in ["nav", "solid", "door"]:
+			if tile.has(key) and not tile[key] is bool:
+				push_error("LevelDef: " + key + " debe ser bool.")
+				return false
+		if tile.has("edge") and not (tile["edge"] is StringName or tile["edge"] is String):
+			push_error("LevelDef: edge debe ser nombre de material.")
+			return false
+		if tile.has("zone") and (not tile["zone"] is String or String(tile["zone"]).is_empty()):
+			push_error("LevelDef: zone debe ser nombre no vacío.")
+			return false
+		if tile.has("zones"):
+			if not tile["zones"] is Array:
+				push_error("LevelDef: zones debe ser Array[String].")
+				return false
+			for zone: Variant in tile["zones"]:
+				if not zone is String or String(zone).is_empty():
+					push_error("LevelDef: nombre de zona inválido.")
+					return false
+		if tile.has("light"):
+			if not tile["light"] is Dictionary:
+				push_error("LevelDef: light debe ser Dictionary.")
+				return false
+			var light: Dictionary = tile["light"]
+			if (light.has("panel") and not light["panel"] is bool) or (light.has("height") and (not _number(light["height"]) or not _positive(float(light["height"])))):
+				push_error("LevelDef: panel o altura de luz inválidos.")
+				return false
+	for prop: Dictionary in _def.props:
+		if prop.has("tilt"):
+			if not prop["tilt"] is Vector3:
+				push_error("LevelDef: tilt debe ser Vector3.")
+				return false
+			var tilt: Vector3 = prop["tilt"]
+			if not tilt.is_finite() or not is_zero_approx(tilt.y):
+				push_error("LevelDef: tilt finito en X/Z; usar rot_y para Y.")
+				return false
 	var has_cells: bool = false
 	for row: String in _def.rows:
 		has_cells = has_cells or not row.is_empty()
@@ -167,25 +234,39 @@ func _emit_cell(c: int, r: int) -> void:
 	var x: float = c * cs
 	var z: float = r * cs
 	var cell: int = r * _width + c
+	var height: float = _cell_height(tile)
+	var top: float = _clearance(tile)
 	if tile.has("floor"):
 		_face(tile["floor"], Vector3(x, 0, z), Vector3(cs, 0, 0), Vector3(0, 0, cs), Vector3.UP, cell, 0)
 	if tile.has("ceiling") and not bool(tile.get("door", false)):
-		_face(tile["ceiling"], Vector3(x, _def.wall_height, z), Vector3(cs, 0, 0), Vector3(0, 0, cs), Vector3.DOWN, cell, 1)
+		_face(tile["ceiling"], Vector3(x, height, z), Vector3(cs, 0, 0), Vector3(0, 0, cs), Vector3.DOWN, cell, 1)
 	if bool(tile.get("door", false)):
 		_face(tile.get("wall", &"default"), Vector3(x, DOOR_HEIGHT, z), Vector3(cs, 0, 0), Vector3(0, 0, cs), Vector3.DOWN, cell, 2)
-		_shape(Vector3(cs, _def.wall_height - DOOR_HEIGHT, cs), Vector3(x + cs * 0.5, (DOOR_HEIGHT + _def.wall_height) * 0.5, z + cs * 0.5))
+		if height > DOOR_HEIGHT:
+			_shape(Vector3(cs, height - DOOR_HEIGHT, cs), Vector3(x + cs * 0.5, (DOOR_HEIGHT + height) * 0.5, z + cs * 0.5))
+	if _def.open_void and tile.has("floor"):
+		_face(tile.get("edge", tile["floor"]), Vector3(x, -_def.void_skirt_depth, z), Vector3(cs, 0, 0), Vector3(0, 0, cs), Vector3.DOWN, cell, 3)
 	for dir: Vector2i in DIRS:
 		var neighbour: Dictionary = _tile(c + dir.x, r + dir.y)
 		var bottom: float = 0.0
 		var mat: StringName
+		if _def.open_void and tile.has("floor") and (not _open(neighbour) or not neighbour.has("floor")) and not bool(neighbour.get("solid", false)):
+			var skirt: Vector3 = Vector3(x, -_def.void_skirt_depth, z)
+			var edge_along: Vector3 = Vector3(cs, 0, 0)
+			if dir.x != 0:
+				skirt.x += cs if dir.x > 0 else 0.0
+				edge_along = Vector3(0, 0, cs)
+			elif dir.y > 0:
+				skirt.z += cs
+			_face(tile.get("edge", tile["floor"]), skirt, edge_along, Vector3(0, _def.void_skirt_depth, 0), Vector3(dir.x, 0, dir.y), cell, 3)
 		if neighbour.is_empty():
 			if not tile.has("void_wall"):
 				continue
 			mat = tile["void_wall"]
 		elif bool(neighbour.get("solid", false)):
 			mat = neighbour.get("wall", &"default")
-		elif bool(neighbour.get("door", false)) and not bool(tile.get("door", false)):
-			bottom = DOOR_HEIGHT
+		elif _clearance(neighbour) < top:
+			bottom = _clearance(neighbour)
 			mat = neighbour.get("wall", &"default")
 		else:
 			continue
@@ -196,7 +277,10 @@ func _emit_cell(c: int, r: int) -> void:
 			along = Vector3(0, 0, cs)
 		elif dir.y > 0:
 			origin.z += cs
-		_face(mat, origin, along, Vector3(0, (DOOR_HEIGHT if bool(tile.get("door", false)) else _def.wall_height) - bottom, 0), Vector3(-dir.x, 0, -dir.y), cell, 2)
+		_face(mat, origin, along, Vector3(0, top - bottom, 0), Vector3(-dir.x, 0, -dir.y), cell, 2)
+		if (bottom > 0.0 and not bool(neighbour.get("door", false))) or (_def.open_void and neighbour.is_empty()):
+			var depth: Vector3 = Vector3(0.04 if dir.x != 0 else cs, top - bottom, cs if dir.x != 0 else 0.04)
+			_shape(depth, origin + along * 0.5 + Vector3(0, (top - bottom) * 0.5, 0))
 		if bottom == 0.0 and _def.baseboard_height > 0.0:
 			var inward: Vector3 = Vector3(-dir.x, 0, -dir.y)
 			_palette_uv = Vector2((_palette_index(_def.baseboard_tint) + 0.5) / PALETTE_SIZE, 0.5)
@@ -206,8 +290,8 @@ func _emit_cell(c: int, r: int) -> void:
 		_add_marker(String(tile["marker"]), Vector3(x + cs * 0.5, 0, z + cs * 0.5))
 	if tile.has("light"):
 		var light: Dictionary = tile["light"].duplicate()
-		light["pos"] = Vector3(x + cs * 0.5, _def.wall_height - 0.02, z + cs * 0.5)
-		_add_light(light, true)
+		light["pos"] = Vector3(x + cs * 0.5, float(light.get("height", height - 0.02)), z + cs * 0.5)
+		_add_light(light, bool(light.get("panel", true)))
 
 func _face(material: StringName, origin: Vector3, u: Vector3, v: Vector3, normal: Vector3, cell: int, kind: int, fit: bool = false, transform: Transform3D = Transform3D.IDENTITY) -> void:
 	if not _surfaces.has(material):
@@ -243,6 +327,7 @@ func _append_face(data: SurfaceData, origin: Vector3, u: Vector3, v: Vector3, no
 			data.uv2s.append(Vector2(panel_energy, 0))
 			data.colors.append(color)
 			data.cells.append(cell)
+			data.chunks.append(cell if cell >= 0 else _object_cell)
 			data.kinds.append(kind)
 	var reverse: bool = u.cross(v).dot(normal) > 0.0
 	for j: int in range(nv):
@@ -257,6 +342,7 @@ func _append_face(data: SurfaceData, origin: Vector3, u: Vector3, v: Vector3, no
 func _emit_box(box: Dictionary) -> void:
 	var center: Vector3 = box["pos"]
 	var size: Vector3 = box["size"]
+	_object_cell = _position_cell(center)
 	var angle: float = deg_to_rad(float(box.get("rot_y", 0.0)))
 	var transform: Transform3D = Transform3D(Basis(Vector3.UP, angle), center)
 	var p: Vector3 = -size * 0.5
@@ -275,6 +361,7 @@ func _emit_box(box: Dictionary) -> void:
 	_palette_uv = Vector2(-1.0, -1.0)
 	if bool(box.get("collide", true)):
 		_shape(size, center, angle)
+		_nav_obstacles.append(transform * AABB(-size * 0.5, size))
 	if bool(box.get("occlude", false)):
 		if is_zero_approx(angle):
 			_occluders.append(AABB(center - size * 0.5, size))
@@ -310,7 +397,7 @@ func _merge_collision() -> void:
 			if not next.has(key):
 				var rect: Rect2i = active[key]
 				var cs: float = _def.cell_size
-				_shape(Vector3(rect.size.x * cs, _def.wall_height, rect.size.y * cs), Vector3((rect.position.x + rect.size.x * 0.5) * cs, _def.wall_height * 0.5, (rect.position.y + rect.size.y * 0.5) * cs))
+				_shape(Vector3(rect.size.x * cs, maxf(_max_height, _def.wall_height), rect.size.y * cs), Vector3((rect.position.x + rect.size.x * 0.5) * cs, maxf(_max_height, _def.wall_height) * 0.5, (rect.position.y + rect.size.y * 0.5) * cs))
 		active = next
 
 func _add_marker(base: String, pos: Vector3) -> void:
@@ -335,6 +422,7 @@ func _add_light(input: Dictionary, panel: bool) -> void:
 	var index: int = _lights.size()
 	_lights.append(light)
 	var pos: Vector3 = light["pos"]
+	_object_cell = _position_cell(pos)
 	var samples: PackedVector3Array = PackedVector3Array([pos])
 	if panel:
 		var cs: float = _def.cell_size
@@ -342,8 +430,8 @@ func _add_light(input: Dictionary, panel: bool) -> void:
 		var color: Color = light["color"]
 		color.a = 1.0
 		# Carcasa modelada fundida en la paleta; el difusor queda detrás de la rejilla.
-		_emit_prop({"model": "ceiling_fixture", "pos": Vector3(pos.x, _def.wall_height, pos.z), "collide": false})
-		_append_face(_panels[1 if light["flicker"] else 0], Vector3(pos.x - 0.59, _def.wall_height - 0.06, pos.z - 0.29), Vector3(1.18, 0, 0), Vector3(0, 0, 0.58), Vector3.DOWN, -1, 4, true, Transform3D.IDENTITY, 1.0, color, light["energy"])
+		_emit_prop({"model": "ceiling_fixture", "pos": Vector3(pos.x, pos.y + 0.02, pos.z), "collide": false})
+		_append_face(_panels[1 if light["flicker"] else 0], Vector3(pos.x - 0.59, pos.y - 0.04, pos.z - 0.29), Vector3(1.18, 0, 0), Vector3(0, 0, 0.58), Vector3.DOWN, -1, 4, true, Transform3D.IDENTITY, 1.0, color, light["energy"])
 	_samples.append(samples)
 	var radius: float = light["radius"]
 	var lo: Vector2i = _cell(pos - Vector3(radius, 0, radius))
@@ -404,9 +492,9 @@ func _visible(start: Vector3, finish: Vector3) -> bool:
 		var end: float = minf(1.0, minf(tx, tz))
 		var tile: Dictionary = _tile(cell.x, cell.y)
 		if end > entry + 0.000001:
-			if tile.is_empty() or bool(tile.get("solid", false)):
+			if (tile.is_empty() and not _def.open_void) or bool(tile.get("solid", false)):
 				return false
-			if bool(tile.get("door", false)) and maxf(start.y + delta.y * entry, start.y + delta.y * end) > DOOR_HEIGHT:
+			if _open(tile) and (bool(tile.get("door", false)) or _variable_heights) and maxf(start.y + delta.y * entry, start.y + delta.y * end) > _clearance(tile):
 				return false
 		if end >= 1.0:
 			break
@@ -506,7 +594,7 @@ func _ao(p: Vector3, n: Vector3, cell: int, kind: int) -> float:
 		if absf(coordinate - boundary) < 0.001 and (bool(tile.get("solid", false)) or (tile.is_empty() and _grid[cell].has("void_wall"))):
 			near_walls += 1
 	var result: float = 1.0
-	if (near_walls > 0 or kind == 2) and (absf(p.y) < 0.001 or absf(p.y - _def.wall_height) < 0.001):
+	if (near_walls > 0 or kind == 2) and (absf(p.y) < 0.001 or absf(p.y - _cell_height(_grid[cell])) < 0.001):
 		result *= 0.72
 	if near_walls >= 2 and absf(n.y) < 0.5:
 		result *= 0.8
@@ -524,9 +612,14 @@ func _emit_prop(prop: Dictionary) -> void:
 		push_error("Modelo no encontrado: " + path)
 		return
 	var instance: Node3D = packed.instantiate() as Node3D
+	_object_cell = _position_cell(prop["pos"])
 	var angle: float = deg_to_rad(float(prop.get("rot_y", 0.0)))
 	var scale: float = float(prop.get("scale", 1.0))
-	var placement: Transform3D = Transform3D(Basis(Vector3.UP, angle).scaled(Vector3.ONE * scale), prop["pos"])
+	var tilt: Vector3 = prop.get("tilt", Vector3.ZERO)
+	var basis: Basis = Basis(Vector3.UP, angle)
+	if not tilt.is_zero_approx():
+		basis = basis * Basis(Vector3.RIGHT, deg_to_rad(tilt.x)) * Basis(Vector3.BACK, deg_to_rad(tilt.z))
+	var placement: Transform3D = Transform3D(basis.scaled(Vector3.ONE * scale), prop["pos"])
 	var local_bounds: AABB = AABB()
 	var has_bounds: bool = false
 	var screen_sum: Vector3 = Vector3.ZERO
@@ -571,6 +664,7 @@ func _emit_prop(prop: Dictionary) -> void:
 				data.uv2s.append(Vector2.ZERO)
 				data.colors.append(Color(0, 0, 0, 0))
 				data.cells.append(-1)
+				data.chunks.append(_object_cell)
 				data.kinds.append(3)
 				var in_model: Vector3 = local * vertices[i]
 				if has_bounds:
@@ -595,9 +689,17 @@ func _emit_prop(prop: Dictionary) -> void:
 		_add_marker(String(prop["screen_marker"]), screen_sum / screen_count + screen_normal.normalized() * 0.004)
 	var center: Vector3 = placement * local_bounds.get_center()
 	var size: Vector3 = local_bounds.size * scale
+	var world_bounds: AABB = placement * local_bounds
 	if bool(prop.get("collide", true)):
-		_shape(size, center, angle)
+		if tilt.is_zero_approx():
+			_shape(size, center, angle)
+		else:
+			_shape(world_bounds.size, world_bounds.get_center())
+		_nav_obstacles.append(world_bounds)
 	if bool(prop.get("occlude", false)):
+		if not tilt.is_zero_approx():
+			_occluders.append(world_bounds)
+			return
 		var quarter_turns: float = angle / (PI * 0.5)
 		if is_equal_approx(quarter_turns, roundf(quarter_turns)):
 			var footprint: Vector3 = size if int(roundf(quarter_turns)) % 2 == 0 else Vector3(size.z, size.y, size.x)
@@ -674,3 +776,168 @@ func _emit_panels() -> void:
 	panels.name = "LightPanels"
 	panels.mesh = mesh
 	_attach(_root, panels)
+
+## Altura geométrica y altura libre: las puertas mantienen su dintel de 2.1 m.
+func _cell_height(tile: Dictionary) -> float:
+	return float(tile.get("height", _def.wall_height))
+
+func _clearance(tile: Dictionary) -> float:
+	return DOOR_HEIGHT if bool(tile.get("door", false)) else _cell_height(tile)
+
+func _number(value: Variant) -> bool:
+	return value is float or value is int
+
+func _positive(value: float) -> bool:
+	return is_finite(value) and value > 0.0
+
+func _position_cell(pos: Vector3) -> int:
+	var coords: Vector2i = _cell(pos)
+	# Los objetos fuera del mapa se asignan al bloque de borde más cercano.
+	return clampi(coords.y, 0, _height - 1) * _width + clampi(coords.x, 0, _width - 1)
+
+## Fusiona losas de la misma altura en rectángulos, sin cubrir huecos.
+func _merge_slabs(kind: String, all_open: bool = false) -> void:
+	var active: Dictionary[Vector3i, Rect2i] = {}
+	var heights: Dictionary[Vector3i, float] = {}
+	for r: int in range(_height + 1):
+		var next: Dictionary[Vector3i, Rect2i] = {}
+		var c: int = 0
+		while r < _height and c < _width:
+			var tile: Dictionary = _tile(c, r)
+			if not _open(tile) or (not all_open and not tile.has(kind)):
+				c += 1
+				continue
+			var height: float = 0.0 if kind == "floor" else _clearance(tile)
+			var first: int = c
+			c += 1
+			while c < _width:
+				var neighbour: Dictionary = _tile(c, r)
+				if not _open(neighbour) or (not all_open and not neighbour.has(kind)) or (kind == "ceiling" and not is_equal_approx(_clearance(neighbour), height)):
+					break
+				c += 1
+			# El identificador de altura evita fusionar techos distintos entre filas.
+			var key: Vector3i = Vector3i(first, c - first, 0)
+			while heights.has(key) and not is_equal_approx(heights[key], height):
+				key.z += 1
+			heights[key] = height
+			var rect: Rect2i = active.get(key, Rect2i(first, r, c - first, 0))
+			rect.size.y += 1
+			next[key] = rect
+		for key: Vector3i in active:
+			if not next.has(key):
+				var rect: Rect2i = active[key]
+				var cs: float = _def.cell_size
+				var thickness: float = _def.void_skirt_depth if kind == "floor" and _def.open_void else 0.2
+				var y: float = -thickness * 0.5 if kind == "floor" else heights[key] + thickness * 0.5
+				_shape(Vector3(rect.size.x * cs, thickness, rect.size.y * cs), Vector3((rect.position.x + rect.size.x * 0.5) * cs, y, (rect.position.y + rect.size.y * 0.5) * cs))
+		active = next
+
+func _navigation_meta() -> void:
+	var heights: PackedFloat32Array = PackedFloat32Array()
+	var walkable: PackedByteArray = PackedByteArray()
+	var zones: Dictionary = {}
+	for index: int in _grid.size():
+		var tile: Dictionary = _grid[index]
+		var coords: Vector2i = Vector2i(index % _width, index / _width)
+		heights.append(_cell_height(tile) if not tile.is_empty() else 0.0)
+		var can_walk: bool = _open(tile) and tile.has("floor") and _clearance(tile) >= 2.0 and bool(tile.get("nav", true))
+		var center: Vector3 = Vector3((coords.x + 0.5) * _def.cell_size, 0, (coords.y + 0.5) * _def.cell_size)
+		if can_walk:
+			for obstacle: AABB in _nav_obstacles:
+				if center.x + 0.3 >= obstacle.position.x and center.x - 0.3 <= obstacle.end.x and center.z + 0.3 >= obstacle.position.z and center.z - 0.3 <= obstacle.end.z:
+					can_walk = false
+					break
+		walkable.append(1 if can_walk else 0)
+		var names: Array[String] = []
+		if tile.has("zone"):
+			names.append(tile["zone"])
+		for zone: String in tile.get("zones", []):
+			if not names.has(zone):
+				names.append(zone)
+		for zone: String in names:
+			if not zones.has(zone):
+				var cells: Array[Vector2i] = []
+				zones[zone] = cells
+			(zones[zone] as Array[Vector2i]).append(coords)
+	_root.set_meta("grid_width", _width)
+	_root.set_meta("grid_height", _height)
+	_root.set_meta("cell_heights", heights)
+	_root.set_meta("walkable", walkable)
+	_root.set_meta("zones", zones)
+
+func _shared_material(key: StringName) -> ShaderMaterial:
+	if not _material_cache.has(key):
+		_material_cache[key] = _material(key)
+	return _material_cache[key]
+
+## Copia cada vértice una vez por bloque, conservando atributos y orden de triángulos.
+func _partition(source: SurfaceData) -> Dictionary[Vector2i, SurfaceData]:
+	var result: Dictionary[Vector2i, SurfaceData] = {}
+	var remaps: Dictionary = {}
+	for index: int in source.indices:
+		var cell: int = source.chunks[index]
+		var coords: Vector2i = Vector2i(cell % _width, cell / _width)
+		var chunk: Vector2i = Vector2i(coords.x / _def.chunk_cells, coords.y / _def.chunk_cells)
+		if not result.has(chunk):
+			result[chunk] = SurfaceData.new()
+			remaps[chunk] = {}
+		var target: SurfaceData = result[chunk]
+		var remap: Dictionary = remaps[chunk]
+		if not remap.has(index):
+			remap[index] = target.positions.size()
+			target.positions.append(source.positions[index])
+			target.normals.append(source.normals[index])
+			target.uvs.append(source.uvs[index])
+			target.uv2s.append(source.uv2s[index])
+			target.colors.append(source.colors[index])
+		target.indices.append(remap[index])
+	return result
+
+func _set_range(instance: MeshInstance3D) -> void:
+	if _def.visibility_range > 0.0:
+		instance.visibility_range_end = _def.visibility_range
+		instance.visibility_range_end_margin = minf(_def.visibility_range * 0.1, _def.cell_size * _def.chunk_cells)
+		instance.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_DISABLED
+
+func _emit_chunks() -> void:
+	var chunks: Node3D = Node3D.new()
+	chunks.name = "Chunks"
+	_attach(_root, chunks)
+	var meshes: Dictionary[Vector2i, ArrayMesh] = {}
+	for key: StringName in _surfaces:
+		var pieces: Dictionary[Vector2i, SurfaceData] = _partition(_surfaces[key])
+		for chunk: Vector2i in pieces:
+			if not meshes.has(chunk):
+				meshes[chunk] = ArrayMesh.new()
+			var mesh: ArrayMesh = meshes[chunk]
+			mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, pieces[chunk].arrays())
+			mesh.surface_set_material(mesh.get_surface_count() - 1, _shared_material(key))
+			mesh.surface_set_name(mesh.get_surface_count() - 1, String(key))
+	var nodes: Dictionary[Vector2i, MeshInstance3D] = {}
+	for chunk: Vector2i in meshes:
+		var instance: MeshInstance3D = MeshInstance3D.new()
+		instance.name = "Chunk_%d_%d" % [chunk.x, chunk.y]
+		instance.mesh = meshes[chunk]
+		_set_range(instance)
+		_attach(chunks, instance)
+		nodes[chunk] = instance
+	# Los difusores siguen el bloque de su luminaria y comparten dos materiales.
+	var panel_meshes: Dictionary[Vector2i, ArrayMesh] = {}
+	for group: int in range(2):
+		var pieces: Dictionary[Vector2i, SurfaceData] = _partition(_panels[group])
+		var material: ShaderMaterial = ShaderMaterial.new()
+		material.shader = load("res://shaders/light_panel.gdshader") as Shader
+		material.set_shader_parameter("flicker", group == 1)
+		for chunk: Vector2i in pieces:
+			if not panel_meshes.has(chunk):
+				panel_meshes[chunk] = ArrayMesh.new()
+			var mesh: ArrayMesh = panel_meshes[chunk]
+			mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, pieces[chunk].arrays())
+			mesh.surface_set_material(mesh.get_surface_count() - 1, material)
+			mesh.surface_set_name(mesh.get_surface_count() - 1, "flicker" if group == 1 else "steady")
+	for chunk: Vector2i in panel_meshes:
+		var instance: MeshInstance3D = MeshInstance3D.new()
+		instance.name = "LightPanels"
+		instance.mesh = panel_meshes[chunk]
+		_set_range(instance)
+		_attach(nodes[chunk], instance)

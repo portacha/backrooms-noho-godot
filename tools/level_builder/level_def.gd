@@ -6,8 +6,23 @@ var name: String = ""
 var rows: PackedStringArray = PackedStringArray()
 var cell_size: float = 2.0
 var wall_height: float = 2.8
+## true = suelo/techo solo en celdas que los declaren; el resto es abismo sin colisión.
+var open_void: bool = false
+## Grosor de las islas: faldón e inferior con `edge` o material de suelo. Finito y > 0.
+var void_skirt_depth: float = 0.5
+## Bloques de N×N celdas bajo Chunks; 0 conserva Geometry. Entero >= 0.
+var chunk_cells: int = 0
+## Distancia de ocultación por bloque; 0 desactiva. Finita y >= 0; margen con histéresis.
+var visibility_range: float = 0.0
 var ambient: Color = Color(0.02, 0.02, 0.02)
 var bounce: float = 0.25
+## Tiles: `height: float` finito > 0 (defecto wall_height; puerta >= 2.1),
+## `edge: StringName` (faldón/inferior), `nav: bool` (false fuerza no transitable),
+## `zone: String` o `zones: Array[String]` (nombres no vacíos, sin duplicados por celda).
+## `light.panel: bool` (defecto true; false omite luminaria y difusor),
+## `light.height: float` finito > 0 (altura absoluta del foco; defecto height - 0.02).
+## Metas de raíz: grid_width/grid_height; cell_heights y walkable en orden fila×ancho+columna;
+## zones: Dictionary de nombre a Array[Vector2i]. Altura efectiva de puertas = 2.1 para navegación.
 var tiles: Dictionary = {}
 var materials: Dictionary = {}
 var boxes: Array[Dictionary] = []
@@ -24,6 +39,8 @@ var flicker_color: Color = Color(1.0, 0.9, 0.72)
 ## horneado; solo con giros múltiplos de 90°), `screen_material: StringName` (material del nivel para
 ## la superficie `Screen`, por defecto `screen`), `screen_marker: String` (marcador delante de la pantalla),
 ## `tints: Dictionary` (nombre de material de Blender → Color, para variantes envejecidas).
+## `tilt: Vector3` finito, grados X/Z (Y debe ser 0; se usa rot_y). Defecto Vector3.ZERO.
+## Un prop inclinado usa la AABB mundial como colisión/oclusor; sin inclinación conserva su caja.
 var props: Array[Dictionary] = []
 
 
