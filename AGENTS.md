@@ -38,6 +38,8 @@ Los archivos `00`–`09` se destilan de `investigacion.txt` y son **normativos**
 | [docs/15-implementacion.md](docs/15-implementacion.md) | **Implementación**: qué es jugable, horneado de luz en colores de vértice (`tools/build_levels.gd`), mapa del código, pruebas automáticas, desviaciones respecto al diseño y pendientes | Siempre, antes de tocar código, niveles o herramientas |
 | [docs/16-assets-stock.md](docs/16-assets-stock.md) | **Adquisición de modelos y texturas**: decisión por importancia/visibilidad, fuentes y licencias verificadas, API/MCP, descargador CC0, staging, adaptación y procedencia | Antes de buscar, descargar, modelar o incorporar recursos para ambientación |
 
+| [docs/17-orquestacion-agentes.md](docs/17-orquestacion-agentes.md) | **Orquestación de agentes**: reparto entre el agente principal y `codex`/`opencode`, modelos, lanzador (`tools/agents/launch.sh`), propiedad de archivos, contratos, olas, anatomía de un encargo y revisión | Antes de delegar trabajo en paralelo o de retomar una ola a medias |
+
 ## Reglas duras (no negociables)
 
 1. **Legal / canon**: prohibido usar contenido de las wikis de Backrooms (niveles numerados, entidades con nombre como Smilers/Partygoers, facciones como M.E.G.). El canon es **original**. Ver `docs/01`.
