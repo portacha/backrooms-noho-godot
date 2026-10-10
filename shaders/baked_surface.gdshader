@@ -7,6 +7,13 @@ uniform float texture_saturation : hint_range(0.0, 1.0) = 1.0;
 uniform vec3 flicker_color : source_color = vec3(1.0, 0.9, 0.72);
 uniform float emission_boost = 1.0;
 uniform float unlit_energy = -1.0;
+// Relieve y brillo (docs/15): el mapa de normales da grano a la luz horneada y a la linterna;
+// `sheen` es el reflejo rasante de un suelo pulido o mojado bajo las luces horneadas.
+uniform sampler2D normal_tex : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform float normal_strength = 0.0;
+uniform float roughness : hint_range(0.0, 1.0) = 1.0;
+uniform float specular : hint_range(0.0, 1.0) = 0.0;
+uniform float sheen = 0.0;
 // Compensa texturas oscuras al teñirlas con `tint` (p. ej. alfombra en grises × azul).
 uniform float texture_gain = 1.0;
 // Doble realidad (docs/15): la misma pared tiene dos pieles. `alt_tex` es la de backrooms —lo que
@@ -57,16 +64,43 @@ void fragment() {
 		float real = step(order, reality * 1.04 - 0.02);
 		base = mix(texture(alt_tex, UV * alt_uv).rgb * alt_tint.rgb, base, real);
 		real_light = reality;
-		back_light = 1.0 - reality;
+		// En lo real los tubos no mueren del todo: quedan en un rescoldo.
+		back_light = 1.0 - reality * 0.9;
 	}
-	ROUGHNESS = 1.0;
-	SPECULAR = 0.0;
+	float skin = 1.0;
+	if (dual) {
+		vec3 skin_block = floor(world_pos * 0.85 + 0.013);
+		float skin_order = fract(sin(dot(skin_block, vec3(12.9898, 78.233, 37.719)) + reality_seed * 17.0) * 43758.5453);
+		skin = step(skin_order, reality * 1.04 - 0.02);
+	}
+	float relief = 1.0;
+	if (normal_strength > 0.0) {
+		vec3 detail = texture(normal_tex, UV).rgb * 2.0 - 1.0;
+		detail.xy *= normal_strength * skin;
+		// Sin tangentes en la malla horneada: base tangente a partir de derivadas de pantalla.
+		vec3 dp1 = dFdx(VERTEX);
+		vec3 dp2 = dFdy(VERTEX);
+		vec2 duv1 = dFdx(UV);
+		vec2 duv2 = dFdy(UV);
+		vec3 dp2perp = cross(dp2, NORMAL);
+		vec3 dp1perp = cross(NORMAL, dp1);
+		vec3 tangent = dp2perp * duv1.x + dp1perp * duv2.x;
+		vec3 bitangent = dp2perp * duv1.y + dp1perp * duv2.y;
+		float scale = inversesqrt(max(max(dot(tangent, tangent), dot(bitangent, bitangent)), 1e-12));
+		NORMAL = normalize(mat3(tangent * scale, bitangent * scale, NORMAL) * normalize(detail));
+		// La luz horneada no tiene dirección: un falso rasante le da el grano del material.
+		relief = clamp(1.0 + (detail.x * 0.45 + detail.y * 0.7) * 0.9, 0.35, 1.7);
+	}
+	ROUGHNESS = mix(1.0, roughness, skin);
+	SPECULAR = specular * skin;
 	if (unlit_energy >= 0.0) {
 		float side = emissive_side > 0.5 ? real_light : (emissive_side < -0.5 ? back_light : 1.0);
 		ALBEDO = vec3(0.0);
 		EMISSION = base * unlit_energy * world_light * (dual ? side : 1.0);
 	} else {
 		ALBEDO = base;
-		EMISSION = ALBEDO * (baked_color.rgb * 2.0 * real_light + baked_color.a * 2.0 * flicker_color * flick(TIME) * back_light) * world_light * emission_boost;
+		vec3 light = baked_color.rgb * 2.0 * real_light + baked_color.a * 2.0 * flicker_color * flick(TIME) * back_light;
+		float grazing = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 3.0);
+		EMISSION = (ALBEDO * light * relief + light * grazing * sheen * skin) * world_light * emission_boost;
 	}
 }

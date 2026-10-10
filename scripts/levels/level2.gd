@@ -13,7 +13,7 @@ const OFFERINGS: int = 3
 const REAL_SECONDS: float = 26.0
 const MANIFEST_SECONDS: float = 25.0
 const FOG_BACKROOMS: Color = Color(0.05, 0.045, 0.02)
-const FOG_REAL: Color = Color(0.04, 0.026, 0.014)
+const FOG_REAL: Color = Color(0.075, 0.052, 0.036)
 
 var altar: LetterAltar = null
 var lit_count: int = 0
@@ -45,6 +45,7 @@ func _ready() -> void:
 	set_reality(0.0)
 
 	_build_documents()
+	_build_painted_signs()
 	_build_offerings()
 	_build_pyramid()
 	_build_audio()
@@ -77,6 +78,25 @@ func _process(delta: float) -> void:
 func _build_documents() -> void:
 	for id: String in ["d07", "d08", "d09"]:
 		add_document(marker(id), "res://resources/documents/%s.tres" % id, 2.4)
+
+
+## Rótulos de plantilla pintados en las columnas: la oficina que esto fue sigue dando órdenes.
+func _build_painted_signs() -> void:
+	var texts: Array[String] = ["LOS ARCHIVOS\nNUNCA\nMUEREN", "AQUÍ\nTAMBIÉN\nSIGUES", "TODO\nEXPEDIENTE\nVUELVE", "NADIE\nSE VA\nDEL TODO"]
+	for index: int in texts.size():
+		var at: Vector3 = marker("paint_%d" % index)
+		var facing: Vector3 = marker("paint_%d_n" % index) - at
+		var label: Label3D = Label3D.new()
+		label.text = texts[index]
+		label.font = SIGN_FONT
+		label.font_size = 120
+		label.pixel_size = 0.0021
+		label.line_spacing = -18.0
+		label.outline_size = 0
+		label.modulate = Color(0.05, 0.045, 0.04, 0.82)
+		add_child(label)
+		label.global_position = at
+		label.rotation.y = atan2(facing.x, facing.z)
 
 
 func _build_offerings() -> void:
@@ -272,7 +292,7 @@ func _on_reality_changed() -> void:
 		return
 	# La niebla también tiene dos caras: polvo de oficina o humo de copal.
 	_environment.fog_light_color = FOG_BACKROOMS.lerp(FOG_REAL, reality)
-	_environment.fog_density = lerpf(0.012, 0.03, reality)
+	_environment.fog_density = lerpf(0.012, 0.024, reality)
 
 
 ## Brillo de la llama (y del cuerpo de cera) de una veladora dinámica.

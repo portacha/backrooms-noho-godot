@@ -1,7 +1,7 @@
 extends Node
 ## Capturas de depuración (herramienta de desarrollo, no forma parte del juego).
 ## Uso: SHOT_SCENE=res://... SHOT_VIEWS="nombre:x,z,yaw,pitch;..." godot --path . res://tools/debug/shot.tscn
-## Opcionales: SHOT_FLASH=1 (linterna), SHOT_LIVE=1 (deja correr el guion del nivel), SHOT_Y=altura.
+## Opcionales: SHOT_REALITY=0..1 (doble realidad), SHOT_FLASH=1 (linterna), SHOT_LIVE=1 (deja correr el guion del nivel), SHOT_Y=altura.
 
 func _ready() -> void:
 	var scene: Node = (load(OS.get_environment("SHOT_SCENE")) as PackedScene).instantiate()
@@ -15,6 +15,8 @@ func _ready() -> void:
 	if OS.get_environment("SHOT_FLASH") == "1":
 		player.flashlight.available = true
 		player.flashlight.turn(true)
+	if not OS.get_environment("SHOT_REALITY").is_empty() and scene.has_method("set_reality"):
+		scene.call("set_reality", OS.get_environment("SHOT_REALITY").to_float())
 	var view_index: int = 0
 	for view: String in OS.get_environment("SHOT_VIEWS").split(";", false):
 		var parts: PackedStringArray = view.split(":")

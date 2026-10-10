@@ -21,7 +21,7 @@ func _init() -> void:
 	baseboard_height = 0.0
 	chunk_cells = 6
 	visibility_range = 70.0
-	ambient = Color(0.012, 0.009, 0.006)
+	ambient = Color(0.026, 0.022, 0.02)
 	bounce = 0.3
 	dual_reality = true
 	flicker_color = Color(1.0, 0.93, 0.7)
@@ -93,6 +93,20 @@ func _init() -> void:
 	props.append({"model": "candle_short", "pos": sheet + Vector3(-0.35, 0, 0.2), "collide": false})
 	lights.append({"pos": sheet + Vector3(0, 0.5, 0), "color": WARM, "energy": 0.7, "radius": 4.0})
 	markers["d08"] = sheet + Vector3(0, 0.05, 0)
+	# Luz real de la nave: casi nada. Un resplandor frío y alto cada tanto, lo justo para que las
+	# columnas se recorten contra el humo y el suelo pulido devuelva una franja.
+	for y: int in range(6, DEPTH - 2, 8):
+		for x: int in range(10, WIDTH - 2, 8):
+			lights.append({"pos": cell(x, y) + Vector3(1.0, 5.6, 1.0), "color": Color(0.42, 0.5, 0.66), "energy": 1.5, "radius": 17.0})
+	# Rótulos pintados en las columnas que flanquean la ruta a la pirámide (los escribe el nivel).
+	markers["paint_0"] = cell(12, 12) + Vector3(-1.008, 2.3, 0.0)
+	markers["paint_0_n"] = markers["paint_0"] + Vector3(-1, 0, 0)
+	markers["paint_1"] = cell(24, 16) + Vector3(0.0, 2.3, 1.008)
+	markers["paint_1_n"] = markers["paint_1"] + Vector3(0, 0, 1)
+	markers["paint_2"] = cell(24, 8) + Vector3(-1.008, 2.3, 0.0)
+	markers["paint_2_n"] = markers["paint_2"] + Vector3(-1, 0, 0)
+	markers["paint_3"] = cell(8, 20) + Vector3(1.008, 2.3, 0.0)
+	markers["paint_3_n"] = markers["paint_3"] + Vector3(1, 0, 0)
 	# Apariciones: lejos, entre columnas, siempre de perfil respecto a la ruta.
 	var spots: Array[Vector2i] = [Vector2i(22, 3), Vector2i(34, 18), Vector2i(6, 23), Vector2i(15, 10), Vector2i(26, 14), Vector2i(34, 3), Vector2i(10, 14), Vector2i(23, 24)]
 	for i: int in spots.size():
@@ -150,7 +164,7 @@ func _offering(rng: RandomNumberGenerator, index: int, centre: Vector3, yaw: flo
 ## Pirámide de tres niveles de archiveros oxidados. Apagada hasta que arden las tres ofrendas.
 func _pyramid(rng: RandomNumberGenerator) -> void:
 	var centre: Vector3 = cell(PYRAMID.x, PYRAMID.y)
-	var rust: Dictionary = {"Metal_Grey": Color(0.4, 0.22, 0.12), "Metal_Dark": Color(0.2, 0.11, 0.07)}
+	var rust: Dictionary = {"Metal_Grey": Color(0.33, 0.25, 0.2), "Metal_Dark": Color(0.16, 0.11, 0.09)}
 	for level: int in 3:
 		var half: float = 1.9 - level * 0.62
 		var count: int = 7 - level * 2
@@ -168,8 +182,10 @@ func _pyramid(rng: RandomNumberGenerator) -> void:
 	for angle_index: int in 6:
 		var angle: float = angle_index * TAU / 6.0 + 0.4
 		props.append({"model": "marigold_pile", "pos": centre + Vector3(cos(angle) * 4.2, 0, sin(angle) * 4.2), "rot_y": angle_index * 50.0, "collide": false})
-	lights.append({"pos": centre + Vector3(0, 0.6, 3.4), "color": WARM, "energy": 0.55, "radius": 6.0})
-	lights.append({"pos": centre + Vector3(0, 0.6, -3.4), "color": WARM, "energy": 0.55, "radius": 6.0})
+	for side: int in 4:
+		var out: Vector3 = Basis(Vector3.UP, side * PI * 0.5) * Vector3(0, 0.7, 3.3)
+		lights.append({"pos": centre + out, "color": WARM, "energy": 0.8, "radius": 7.0})
+	lights.append({"pos": centre + Vector3(0, 5.6, 0), "color": Color(1.0, 0.3, 0.6), "energy": 0.35, "radius": 9.0})
 	markers["pyramid"] = centre
 	markers["letter"] = centre + Vector3(0, 5.0, 0)
 	# D09: servilleta en el primer peldaño, del lado por el que se llega desde la tercera ofrenda.

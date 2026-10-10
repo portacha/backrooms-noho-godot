@@ -744,6 +744,13 @@ func _material(key: StringName) -> ShaderMaterial:
 	if bool(settings.get("emissive", false)):
 		material.set_shader_parameter("unlit_energy", float(settings.get("energy", 1.0)))
 		material.set_shader_parameter("emissive_side", float(settings.get("reality_side", 0.0)))
+	var normal_path: String = settings.get("normal_texture", "")
+	if not normal_path.is_empty() and ResourceLoader.exists(normal_path):
+		material.set_shader_parameter("normal_tex", load(normal_path))
+		material.set_shader_parameter("normal_strength", float(settings.get("normal_strength", 1.0)))
+	material.set_shader_parameter("roughness", float(settings.get("roughness", 1.0)))
+	material.set_shader_parameter("specular", float(settings.get("specular", 0.0)))
+	material.set_shader_parameter("sheen", float(settings.get("sheen", 0.0)))
 	if _def.dual_reality:
 		material.set_shader_parameter("dual", true)
 		var alt_path: String = settings.get("alt_texture", "")
