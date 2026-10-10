@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="DocumentData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/interaction/document_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"D11"
+medium = 0
+file_name = ""
+voice = 0
+heading = "Convenio laboral, cláusula 12"
+body = "El colaborador acepta que su permanencia en la empresa será conmemorativa.
+La empresa conservará su nombre, su rostro y su tiempo, mientras la empresa exista.
+No habrá liquidación. No habrá recuerdo por separado.
+Bajo la presente, el olvido se considera un beneficio."
+signature = ""

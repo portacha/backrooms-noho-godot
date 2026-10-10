@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="DocumentData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/interaction/document_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"D09"
+medium = 0
+file_name = ""
+voice = 1
+heading = "Servilleta con boceto"
+body = "(dibujo: pirámide de archiveros con cuatro velas arriba)
+si un vivo quiere salir: hay que prenderle las cuatro y dejarle su foto al pie.
+así el olvidado no se queda con él."
+signature = ""

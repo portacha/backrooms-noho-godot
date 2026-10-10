@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="DocumentData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/interaction/document_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"D13"
+medium = 0
+file_name = ""
+voice = 1
+heading = "Fotografía familiar boca abajo"
+body = "(dorso, letra temblorosa)
+Si encuentras esto, no pongas mi foto en ninguna ofrenda. Que se termine conmigo.
+Pero si de todas formas recuerdas… ponla al pie de las cuatro. A mí déjame aquí."
+signature = ""

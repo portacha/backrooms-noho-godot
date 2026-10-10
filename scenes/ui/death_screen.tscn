@@ -1,0 +1,105 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/death_screen.gd" id="1_death"]
+[ext_resource type="FontFile" path="res://assets/fonts/Caveat.ttf" id="2_caveat"]
+
+[node name="DeathScreen" type="CanvasLayer"]
+layer = 90
+process_mode = 3
+script = ExtResource("1_death")
+
+[node name="Black" type="ColorRect" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 1)
+
+[node name="Center" type="CenterContainer" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Column" type="VBoxContainer" parent="Center"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 28
+alignment = 1
+
+[node name="Epitaph" type="Label" parent="Center/Column"]
+custom_minimum_size = Vector2(720, 0)
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.88, 0.86, 0.8, 1)
+theme_override_fonts/font = ExtResource("2_caveat")
+theme_override_font_sizes/font_size = 46
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="RetryButton" type="Button" parent="Center/Column"]
+custom_minimum_size = Vector2(320, 58)
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 22
+text = "REINTENTAR"
+
+[node name="MenuLink" type="Button" parent="Center/Column"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_colors/font_color = Color(1, 1, 1, 0.45)
+theme_override_font_sizes/font_size = 16
+text = "menú"
+flat = true
+
+[node name="Brand" type="VBoxContainer" parent="."]
+layout_mode = 3
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -88.0
+offset_bottom = -32.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+theme_override_constants/separation = 6
+alignment = 1
+
+[node name="Accents" type="HBoxContainer" parent="Brand"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 4
+alignment = 1
+
+[node name="Blue" type="ColorRect" parent="Brand/Accents"]
+custom_minimum_size = Vector2(28, 3)
+layout_mode = 2
+mouse_filter = 2
+color = Color(0.122, 0.373, 1, 0.9)
+
+[node name="White" type="ColorRect" parent="Brand/Accents"]
+custom_minimum_size = Vector2(28, 3)
+layout_mode = 2
+mouse_filter = 2
+color = Color(1, 1, 1, 0.75)
+
+[node name="Orange" type="ColorRect" parent="Brand/Accents"]
+custom_minimum_size = Vector2(28, 3)
+layout_mode = 2
+mouse_filter = 2
+color = Color(1, 0.541, 0.122, 0.9)
+
+[node name="Name" type="Label" parent="Brand"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.5)
+theme_override_font_sizes/font_size = 14
+horizontal_alignment = 1
+text = "NOHO"

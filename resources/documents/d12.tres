@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="DocumentData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/interaction/document_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"D12"
+medium = 3
+file_name = ""
+voice = 2
+heading = ""
+body = "Aquí yace quien firmó sin leer
+y leyó sin correr."
+signature = "— Descansa en la marca."

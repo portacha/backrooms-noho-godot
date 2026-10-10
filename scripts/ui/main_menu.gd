@@ -1,6 +1,7 @@
 class_name MainMenu
 extends Control
 ## Menú principal: portada viva, JUGAR inmediato y marca mínima (docs/13 §6.1, docs/06).
+## Debajo de JUGAR: CONTINUAR (si hay partida), dificultad, opciones y créditos.
 
 ## Azul, blanco y naranja del logotipo NOHO; nada más.
 const ACCENT_BLUE: Color = Color("1f5fff")
@@ -12,7 +13,13 @@ const BRAND_URL: String = "https://lovenoho.com"
 @onready var _overline: Label = $LeftColumn/Overline
 @onready var _title: Label = $LeftColumn/Title
 @onready var _play_button: Button = $LeftColumn/PlayButton
+@onready var _continue_button: Button = $LeftColumn/ContinueButton
+@onready var _difficulty_selector: DifficultySelector = $LeftColumn/DifficultySelector
+@onready var _options_button: Button = $LeftColumn/OptionsButton
+@onready var _credits_button: Button = $LeftColumn/CreditsButton
 @onready var _quit_button: Button = $LeftColumn/QuitButton
+@onready var _options_panel: OptionsPanel = $OptionsPanel
+@onready var _credits_panel: CreditsPanel = $CreditsPanel
 @onready var _brand_link: LinkButton = $BrandLink
 
 
@@ -21,21 +28,31 @@ func _ready() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	_apply_spacing(_overline, 6)
 	_apply_spacing(_title, 10)
-	_apply_spacing(_play_button, 4)
-	_apply_spacing(_quit_button, 4)
-	_style_menu_button(_play_button)
-	_style_menu_button(_quit_button)
+	for button: Button in [_play_button, _continue_button, _options_button, _credits_button, _quit_button]:
+		_apply_spacing(button, 4)
+		_style_menu_button(button)
 	_overline.add_theme_color_override("font_color", ACCENT_ORANGE)
 	_brand_link.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.55))
 	_brand_link.add_theme_color_override("font_hover_color", ACCENT_WHITE)
 	_play_button.pressed.connect(_on_play_pressed)
+	_continue_button.pressed.connect(_on_continue_pressed)
+	_options_button.pressed.connect(_on_options_pressed)
+	_credits_button.pressed.connect(_on_credits_pressed)
 	_quit_button.pressed.connect(_on_quit_pressed)
 	_brand_link.pressed.connect(_on_brand_pressed)
+	_options_panel.closed.connect(_on_panel_closed)
+	_credits_panel.closed.connect(_on_panel_closed)
 	# En Web no se puede salir y en móvil no tiene sentido: solo JUGAR.
 	_quit_button.visible = not (_is_web() or _is_touch_device())
+	refresh_continue()
 	# Foco inicial sin esperar a nada; JUGAR arranca al instante.
 	_play_button.call_deferred("grab_focus")
 	_start_background_drift()
+
+
+## CONTINUAR solo aparece con partida guardada (docs/13 §8: retomar en <5 s).
+func refresh_continue() -> void:
+	_continue_button.visible = Game.has_save()
 
 
 ## Separa las letras con la fuente por defecto (fina y aireada).
@@ -92,12 +109,50 @@ func _on_play_pressed() -> void:
 	Game.start_new_game()
 
 
+func _on_continue_pressed() -> void:
+	Game.continue_game()
+
+
+func _on_options_pressed() -> void:
+	_options_panel.open()
+	_set_menu_focusable(false)
+
+
+func _on_credits_pressed() -> void:
+	_credits_panel.open()
+	_set_menu_focusable(false)
+
+
+func _on_panel_closed() -> void:
+	_set_menu_focusable(true)
+	refresh_continue()
+	_play_button.call_deferred("grab_focus")
+
+
 func _on_quit_pressed() -> void:
 	get_tree().quit()
 
 
 func _on_brand_pressed() -> void:
 	OS.shell_open(BRAND_URL)
+
+
+## Con un panel abierto, el tabulador no debe pasear por el menú de detrás.
+func _set_menu_focusable(enabled: bool) -> void:
+	for node: Node in _collect_controls($LeftColumn):
+		(node as Control).focus_mode = Control.FOCUS_ALL if enabled else Control.FOCUS_NONE
+
+
+func _collect_controls(root: Control) -> Array[Control]:
+	var result: Array[Control] = []
+	for child: Node in root.get_children():
+		var control: Control = child as Control
+		if control == null:
+			continue
+		if control is Button:
+			result.append(control)
+		result.append_array(_collect_controls(control))
+	return result
 
 
 func _is_web() -> bool:

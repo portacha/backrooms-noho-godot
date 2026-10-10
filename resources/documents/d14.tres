@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="DocumentData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/interaction/document_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"D14"
+medium = 0
+file_name = ""
+voice = 0
+heading = "Manual del empleado, página arrancada"
+body = "Los activos de la marca son eternos. Los colaboradores no.
+Ante la pérdida de un colaborador, la marca conservará su memoria como activo intangible.
+Ante la pérdida de la marca, no queda nada que recordar."
+signature = ""

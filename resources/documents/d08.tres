@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="DocumentData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/interaction/document_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"D08"
+medium = 0
+file_name = ""
+voice = 0
+heading = "Expediente de personal, hoja suelta"
+body = "Ficha de colaborador N.º 000. Ingreso: —. Área: traspaso interno. Estatus: no recordado.
+Observaciones: el expediente llegó con cera en el campo del nombre. Nadie ha reclamado sus pertenencias. Reconocimiento pendiente: ninguno."
+signature = ""

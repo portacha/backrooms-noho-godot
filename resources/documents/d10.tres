@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="DocumentData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/interaction/document_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+id = &"D10"
+medium = 0
+file_name = ""
+voice = 1
+heading = "Carta mojada, nunca enviada"
+body = "Este año nadie puso mi foto. El pan se secó en la repisa y los pétalos se volvieron polvo.
+Señalé los pasillos para que no me olvidaran y terminé señalándome a mí.
+Si estás perdido como yo: no corras sobre el agua. Guarda tu carrera para la puerta.
+Y si escuchas mis pasos, no te des la vuelta."
+signature = ""

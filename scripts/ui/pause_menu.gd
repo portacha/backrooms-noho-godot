@@ -1,19 +1,28 @@
 class_name PauseMenu
 extends CanvasLayer
 ## Pausa real de un jugador offline: congela todo y atenúa (docs/13 §6.2).
+## Reanudar · Dificultad · Opciones · Menú principal. Nunca redirige a la marca.
 
 signal paused
 signal resumed
+
+## El audio baja a esta fracción del volumen general mientras se pausa (docs/13 §6.2).
+const DUCK_RATIO: float = 0.1
+const DUCK_TIME: float = 0.3
 
 ## Los niveles lo apagan durante cinemáticas.
 var can_pause: bool = true
 
 var _is_paused: bool = false
+var _volume_tween: Tween = null
 
 @onready var _resume_button: Button = $Center/Card/Margin/Column/ResumeButton
+@onready var _difficulty_selector: DifficultySelector = $Center/Card/Margin/Column/DifficultySelector
+@onready var _options_button: Button = $Center/Card/Margin/Column/OptionsButton
 @onready var _menu_button: Button = $Center/Card/Margin/Column/MenuButton
 @onready var _title: Label = $Center/Card/Margin/Column/Title
 @onready var _card: PanelContainer = $Center/Card
+@onready var _options_panel: OptionsPanel = $OptionsPanel
 @onready var _touch_button: Button = $TouchPauseButton
 
 
@@ -21,18 +30,20 @@ func _ready() -> void:
 	visible = false
 	_style_card()
 	_apply_spacing(_title, 8)
-	_apply_spacing(_resume_button, 3)
-	_apply_spacing(_menu_button, 3)
-	_style_menu_button(_resume_button)
-	_style_menu_button(_menu_button)
+	for button: Button in [_resume_button, _options_button, _menu_button]:
+		_apply_spacing(button, 3)
+		_style_menu_button(button)
 	_resume_button.pressed.connect(resume_game)
+	_options_button.pressed.connect(_on_options_pressed)
 	_menu_button.pressed.connect(_on_menu_pressed)
+	_options_panel.closed.connect(_on_options_closed)
+	Game.settings_changed.connect(_on_settings_changed)
 	_touch_button.pressed.connect(pause_game)
 	_refresh_touch_button()
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not can_pause:
+	if not can_pause or _options_panel.visible:
 		return
 	if event.is_action_pressed("ui_cancel"):
 		toggle_pause()
@@ -55,6 +66,8 @@ func pause_game() -> void:
 	get_tree().paused = true
 	visible = true
 	_refresh_touch_button()
+	_difficulty_selector.refresh()
+	_duck_audio()
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	_resume_button.call_deferred("grab_focus")
 	paused.emit()
@@ -67,11 +80,63 @@ func resume_game() -> void:
 	get_tree().paused = false
 	visible = false
 	_refresh_touch_button()
+	_restore_audio()
 	# En táctil no hay cursor que capturar.
 	if not _is_touch_device():
 		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 	resumed.emit()
 
+
+## Cierra el panel de opciones y vuelve a la tarjeta de pausa.
+func _on_options_pressed() -> void:
+	_card.visible = false
+	_options_panel.open()
+
+
+func _on_options_closed() -> void:
+	_card.visible = true
+	_resume_button.call_deferred("grab_focus")
+
+
+## Si cambia el volumen general con la pausa puesta, sigue atenuado.
+func _on_settings_changed() -> void:
+	if _is_paused:
+		_set_master_db(_ducked_db())
+
+
+# --- Audio --------------------------------------------------------------------------------
+
+func _master_linear() -> float:
+	return clampf(float(Game.setting("master_volume")), 0.0001, 1.0)
+
+
+func _ducked_db() -> float:
+	return linear_to_db(_master_linear() * DUCK_RATIO)
+
+
+func _duck_audio() -> void:
+	_tween_volume(_ducked_db())
+
+
+func _restore_audio() -> void:
+	_tween_volume(linear_to_db(_master_linear()))
+
+
+## El tween se procesa en pausa (el menú está en modo ALWAYS).
+func _tween_volume(target_db: float) -> void:
+	if _volume_tween != null:
+		_volume_tween.kill()
+	var from_db: float = AudioServer.get_bus_volume_db(0)
+	_volume_tween = create_tween()
+	_volume_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_volume_tween.tween_method(_set_master_db, from_db, target_db, DUCK_TIME)
+
+
+func _set_master_db(db: float) -> void:
+	AudioServer.set_bus_volume_db(0, db)
+
+
+# --- Estilo y utilidades -----------------------------------------------------------------
 
 ## Botón táctil solo fuera de la pausa y solo en táctil.
 func _refresh_touch_button() -> void:

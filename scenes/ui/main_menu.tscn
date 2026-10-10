@@ -1,7 +1,10 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/main_menu.gd" id="1_menu"]
 [ext_resource type="Texture2D" path="res://Portada.png" id="2_cover"]
+[ext_resource type="PackedScene" path="res://scenes/ui/difficulty_selector.tscn" id="3_selector"]
+[ext_resource type="PackedScene" path="res://scenes/ui/options_panel.tscn" id="4_options"]
+[ext_resource type="PackedScene" path="res://scenes/ui/credits_panel.tscn" id="5_credits"]
 
 [sub_resource type="Gradient" id="Gradient_vig"]
 offsets = PackedFloat32Array(0, 0.52, 1)
@@ -61,8 +64,8 @@ expand_mode = 1
 anchor_top = 1.0
 anchor_bottom = 1.0
 offset_left = 72.0
-offset_top = -470.0
-offset_right = 720.0
+offset_top = -556.0
+offset_right = 760.0
 offset_bottom = -56.0
 grow_vertical = 0
 mouse_filter = 2
@@ -84,7 +87,7 @@ text = "BACKROOMS NOHO"
 autowrap_mode = 2
 
 [node name="Gap" type="Control" parent="LeftColumn"]
-custom_minimum_size = Vector2(0, 22)
+custom_minimum_size = Vector2(0, 12)
 layout_mode = 2
 mouse_filter = 2
 
@@ -95,12 +98,49 @@ size_flags_horizontal = 0
 theme_override_font_sizes/font_size = 22
 text = "JUGAR"
 
-[node name="QuitButton" type="Button" parent="LeftColumn"]
-custom_minimum_size = Vector2(320, 58)
+[node name="ContinueButton" type="Button" parent="LeftColumn"]
+custom_minimum_size = Vector2(320, 52)
 layout_mode = 2
 size_flags_horizontal = 0
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 18
+text = "CONTINUAR"
+
+[node name="DifficultyCaption" type="Label" parent="LeftColumn"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.55)
+theme_override_font_sizes/font_size = 13
+text = "DIFICULTAD"
+
+[node name="DifficultySelector" parent="LeftColumn" instance=ExtResource("3_selector")]
+custom_minimum_size = Vector2(320, 48)
+layout_mode = 2
+size_flags_horizontal = 0
+
+[node name="OptionsButton" type="Button" parent="LeftColumn"]
+custom_minimum_size = Vector2(320, 52)
+layout_mode = 2
+size_flags_horizontal = 0
+theme_override_font_sizes/font_size = 18
+text = "OPCIONES"
+
+[node name="CreditsButton" type="Button" parent="LeftColumn"]
+custom_minimum_size = Vector2(320, 52)
+layout_mode = 2
+size_flags_horizontal = 0
+theme_override_font_sizes/font_size = 18
+text = "CRÉDITOS"
+
+[node name="QuitButton" type="Button" parent="LeftColumn"]
+custom_minimum_size = Vector2(320, 52)
+layout_mode = 2
+size_flags_horizontal = 0
+theme_override_font_sizes/font_size = 18
 text = "SALIR"
+
+[node name="OptionsPanel" parent="." instance=ExtResource("4_options")]
+
+[node name="CreditsPanel" parent="." instance=ExtResource("5_credits")]
 
 [node name="BrandLink" type="LinkButton" parent="."]
 anchor_left = 1.0
