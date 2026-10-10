@@ -169,18 +169,22 @@ func _dress() -> void:
 	_prop("papel_picado_string", Vector3(21.6, 1.55, 61), {"rot_y": 90.0, "collide": false})
 	boxes.append({"pos": markers["d14"], "size": Vector3(0.012, 0.3, 0.22), "material": &"flat", "tint": Color(0.82, 0.75, 0.6), "collide": false})
 
-	# 4. Isla del altar: la última O sobre peldaños de ofrenda, flanqueada por calaveras.
+	# 4. Isla del altar: la última O flota en mitad de un umbral de ofrendas. El eje queda libre:
+	# a través de la letra, al fondo, se ve el neón de la puerta; por ahí se corre.
 	var altar: Vector3 = markers["altar"]
-	_prop("ofrenda_tier", altar + Vector3(0, 0, 1.3), {})
-	_prop("ofrenda_tier", altar + Vector3(0, 0.45, 1.5), {"scale": 0.7, "collide": false})
 	for side: float in [-1.0, 1.0]:
-		_prop("sugar_skull", altar + Vector3(side * 0.75, 0.45, 1.1), {"rot_y": 180.0, "collide": false})
-		_prop("marigold_vase", altar + Vector3(side * 1.5, 0, 1.2), {"collide": false})
-		_prop("marigold_pile", altar + Vector3(side * 3.2, 0, -0.6), {"rot_y": side * 40.0, "collide": false})
-		_prop("stalagmite", altar + Vector3(side * 5.2, 0, 2.6), {"rot_y": side * 90.0})
-	_prop("copal_censer", altar + Vector3(0, 0.45, 0.8), {"collide": false})
-	_candles(rng, altar + Vector3(0, 0, -0.2), 22, Vector2(2.6, 0.5))
-	lights.append({"pos": altar + Vector3(0, 1.0, 0.2), "color": WARM, "energy": 1.4, "radius": 9.0})
+		_prop("ofrenda_tier", altar + Vector3(side * 2.5, 0, 1.0), {"rot_y": 90.0})
+		_prop("ofrenda_tier", altar + Vector3(side * 2.75, 0.45, 1.0), {"rot_y": 90.0, "scale": 0.7, "collide": false})
+		_prop("sugar_skull", altar + Vector3(side * 2.3, 0.45, 0.4), {"rot_y": -side * 90.0, "collide": false})
+		_prop("sugar_skull", altar + Vector3(side * 2.3, 0.45, 1.6), {"rot_y": -side * 90.0, "collide": false})
+		_prop("copal_censer", altar + Vector3(side * 2.7, 0.77, 1.0), {"collide": false})
+		_prop("marigold_vase", altar + Vector3(side * 2.4, 0, 2.5), {"collide": false})
+		_prop("marigold_vase", altar + Vector3(side * 2.4, 0, -0.5), {"collide": false})
+		_prop("marigold_pile", altar + Vector3(side * 3.9, 0, 0.2), {"rot_y": side * 40.0, "collide": false})
+		_prop("stalagmite", altar + Vector3(side * 5.4, 0, 2.6), {"rot_y": side * 90.0})
+		_candles(rng, altar + Vector3(side * 1.75, 0, 1.0), 12, Vector2(0.25, 2.4))
+	_prop("papel_picado_string", altar + Vector3(0, 3.0, 1.0), {"scale": 2.4, "collide": false})
+	lights.append({"pos": altar + Vector3(0, 1.0, 0.6), "color": WARM, "energy": 1.4, "radius": 9.0})
 	lights.append({"pos": altar + Vector3(0, 2.2, 1.0), "color": MAGENTA, "energy": 0.5, "radius": 7.0})
 
 	# 5. Isla de la puerta: nada más que la puerta. El neón baña de magenta el final del puente.

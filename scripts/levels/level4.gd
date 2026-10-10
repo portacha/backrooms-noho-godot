@@ -77,7 +77,7 @@ func _ready() -> void:
 		if beacon != null:
 			_beacons.append(beacon)
 	for i: int in 10:
-		var candle: Node3D = _model("candle_tall", marker("altar") + Vector3(-1.8 + (i % 2) * 3.6, 0, (i / 2) * 0.3), 0.1, 0.02)
+		var candle: Node3D = _model("candle_tall", marker("altar") + Vector3(-1.3 + (i % 2) * 2.6, 0, -1.2 + (i / 2) * 0.9), 0.1, 0.02)
 		if candle != null:
 			_candles.append(candle)
 
