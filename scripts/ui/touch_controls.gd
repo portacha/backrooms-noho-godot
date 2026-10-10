@@ -32,6 +32,9 @@ var _look_touch: int = -1
 ## Centro visual (y táctil) de cada botón, en píxeles de canvas.
 var _sprint_center: Vector2 = Vector2.ZERO
 var _flash_center: Vector2 = Vector2.ZERO
+var _base_look_sensitivity: float = 0.6
+var _touch_opacity: float = 0.35
+var _touch_scale: float = 1.0
 
 @onready var _joystick: VirtualJoystick = $Joystick
 @onready var _sprint_button: TouchScreenButton = $SprintButton
@@ -39,15 +42,24 @@ var _flash_center: Vector2 = Vector2.ZERO
 
 
 func _ready() -> void:
-	_sprint_button.texture_normal = _make_button_texture("sprint", false)
-	_sprint_button.texture_pressed = _make_button_texture("sprint", true)
-	_flash_button.texture_normal = _make_button_texture("flash", false)
-	_flash_button.texture_pressed = _make_button_texture("flash", true)
+	_base_look_sensitivity = look_sensitivity
 	_sprint_button.visible = sprint_visible
 	_flash_button.visible = flashlight_visible
+	_apply_settings()
 	_layout_buttons()
 	get_viewport().size_changed.connect(_layout_buttons)
+	Game.settings_changed.connect(_apply_settings)
 	_update_visibility()
+
+
+## Sensibilidad, opacidad y tamaño salen de los ajustes y se aplican en vivo.
+func _apply_settings() -> void:
+	look_sensitivity = _base_look_sensitivity * float(Game.setting("sensitivity"))
+	_touch_opacity = clampf(float(Game.setting("touch_opacity")), 0.1, 1.0)
+	_touch_scale = clampf(float(Game.setting("touch_scale")), 0.75, 1.5)
+	_redraw_buttons()
+	if is_node_ready():
+		_layout_buttons()
 
 
 func _input(event: InputEvent) -> void:
@@ -74,9 +86,9 @@ func _claim_look_finger(index: int, position: Vector2) -> void:
 		return # Mitad izquierda: del joystick.
 	if position.distance_to(view * 0.5) <= CENTER_FREE_RADIUS:
 		return # Centro: del HUD para interactuar.
-	if _sprint_button.visible and position.distance_to(_button_center(_sprint_button)) <= BUTTON_DIAMETER:
+	if _sprint_button.visible and position.distance_to(_button_center(_sprint_button)) <= BUTTON_DIAMETER * _touch_scale:
 		return
-	if _flash_button.visible and position.distance_to(_button_center(_flash_button)) <= BUTTON_DIAMETER:
+	if _flash_button.visible and position.distance_to(_button_center(_flash_button)) <= BUTTON_DIAMETER * _touch_scale:
 		return
 	_look_touch = index
 
@@ -100,11 +112,22 @@ func _button_center(button: TouchScreenButton) -> Vector2:
 ## mientras la forma sí se centra; por eso se resta el radio dos veces.
 func _layout_buttons() -> void:
 	var view: Vector2 = get_viewport().get_visible_rect().size
-	var radius: float = BUTTON_DIAMETER * 0.5
-	_flash_button.position = Vector2(view.x - SAFE_MARGIN - BUTTON_DIAMETER, view.y - SAFE_MARGIN - BUTTON_DIAMETER)
-	_sprint_button.position = Vector2(view.x - SAFE_MARGIN - BUTTON_DIAMETER - BUTTON_DIAMETER - BUTTON_GAP, view.y - SAFE_MARGIN - BUTTON_DIAMETER)
+	var diameter: float = BUTTON_DIAMETER * _touch_scale
+	var radius: float = diameter * 0.5
+	_flash_button.position = Vector2(view.x - SAFE_MARGIN - diameter, view.y - SAFE_MARGIN - diameter)
+	_sprint_button.position = Vector2(view.x - SAFE_MARGIN - diameter - diameter - BUTTON_GAP, view.y - SAFE_MARGIN - diameter)
 	_flash_center = _flash_button.position + Vector2(radius, radius)
 	_sprint_center = _sprint_button.position + Vector2(radius, radius)
+
+
+## La opacidad del ajuste se hornea en la textura; la escala va al nodo.
+func _redraw_buttons() -> void:
+	_sprint_button.texture_normal = _make_button_texture("sprint", false)
+	_sprint_button.texture_pressed = _make_button_texture("sprint", true)
+	_flash_button.texture_normal = _make_button_texture("flash", false)
+	_flash_button.texture_pressed = _make_button_texture("flash", true)
+	_sprint_button.scale = Vector2(_touch_scale, _touch_scale)
+	_flash_button.scale = Vector2(_touch_scale, _touch_scale)
 
 
 ## Círculo blanco procedural con el glifo dibujado; sin assets externos.
@@ -112,7 +135,7 @@ func _make_button_texture(kind: String, pressed: bool) -> ImageTexture:
 	var side: int = int(BUTTON_DIAMETER)
 	var image := Image.create(side, side, false, Image.FORMAT_RGBA8)
 	image.fill(Color(0.0, 0.0, 0.0, 0.0))
-	var alpha: float = 0.60 if pressed else 0.35
+	var alpha: float = minf(_touch_opacity + 0.25, 1.0) if pressed else _touch_opacity
 	var ink := Color(1.0, 1.0, 1.0, alpha)
 	var center := Vector2(side, side) * 0.5
 	_draw_ring(image, center, 44.0, 4.0, ink)
