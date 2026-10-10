@@ -1,14 +1,17 @@
 extends LevelDef
 ## Nivel 4 — "El Umbral del Mictlán" (docs/04, docs/12 §8.4). Contaminación 80 %.
-## Fotografía: vacío índigo (nunca negro puro) con profundidad por niebla, pétalos que suben y
-## restos de oficina flotando a distintas alturas. Cada isla tiene su propia luz: el tubo que aún
-## parpadea en el jirón de backrooms de la llegada, las veladoras del remanso, el altar, y al
-## fondo —visible desde el altar— el neón magenta de la puerta, único punto de fuga.
+## Fotografía (concept/art/04-nivel4-O-*): vacío vino oscuro (nunca negro puro) con profundidad
+## por niebla, pétalos que suben e islotes de roca con restos de oficina a distintas alturas, cada
+## uno con su marco de puerta y su luz. Los puentes son papel picado calado que resplandece en
+## magenta; las guirnaldas convergen en la puerta y su neón, único punto de fuga.
 
 const WARM: Color = Color(1.0, 0.52, 0.18)
 const MAGENTA: Color = Color(1.0, 0.16, 0.62)
 
 var _grid: Array[PackedStringArray] = []
+## Senderos de pétalos: cada uno es la cadena de esquinas (celdas) de los puentes seguros que se
+## continúan. El nivel los convierte en una cinta continua que dobla con el puente.
+var _trails: Array[Array] = []
 
 func _init() -> void:
 	name = "level4"
@@ -18,14 +21,15 @@ func _init() -> void:
 	visibility_range = 110.0
 	wall_height = 2.7
 	baseboard_height = 0.0
-	ambient = Color(0.016, 0.013, 0.026)
+	ambient = Color(0.022, 0.012, 0.022)
 	bounce = 0.3
 	ao_strength = 2.0
 	contact_strength = 0.6
 	materials = {
 		&"carpet": {"texture": "res://assets/textures/office_carpet_torn.png", "uv_scale": 2.0, "texture_saturation": 0.55},
 		&"rock": {"texture": "res://assets/textures/cavern_rock.png", "uv_scale": 2.0, "texture_gain": 1.3},
-		&"paper": {"texture": "res://assets/textures/papel_picado.png", "uv_scale": 2.0, "texture_saturation": 0.8},
+		# Mosaico 2×2 de paneles calados: con celdas de 2 m, cada celda del puente es un panel.
+		&"paper": {"texture": "res://assets/textures/papel_picado_tiles.png", "uv_scale": 4.0, "texture_gain": 1.25},
 		&"wallpaper": {"texture": "res://assets/textures/wallpaper_peeling.png", "uv_scale": 1.4},
 		&"tiles": {"texture": "res://assets/textures/backrooms_ceiling.png", "uv_scale": 1.2},
 		&"flame": {"emissive": true, "tint": Color(1.0, 0.6, 0.2), "energy": 2.6},
@@ -74,6 +78,10 @@ func _init() -> void:
 		"presence_trigger": Vector3(47, 0, 69), "presence": Vector3(61, 0, 47),
 		"chase_from": Vector3(61, 0, 67),
 	})
+	for trail: int in _trails.size():
+		for corner: int in _trails[trail].size():
+			var cell: Vector2i = _trails[trail][corner]
+			markers["trail_%d_%d" % [trail, corner]] = Vector3(cell.x * 2 + 1, 0, cell.y * 2 + 1)
 	_dress()
 	for line: PackedStringArray in _grid:
 		rows.append("".join(line))
@@ -87,6 +95,9 @@ func _island(x: int, z: int, radius: int, tile: String) -> void:
 			_grid[row][column] = tile
 			if (column + row) % 2 == 0:
 				_prop("island_underside", Vector3(column * 2 + 1, -0.8, row * 2 + 1), {"collide": false, "rot_y": 90.0 * ((column * 3 + row) % 4)})
+	# La masa de roca que cuelga del centro: de lejos, la isla es un colmillo y no una losa.
+	_prop("island_underside", Vector3(x * 2 + 1, -1.3, z * 2 + 1), {"collide": false, "scale": radius * 1.25, "rot_y": 37.0 * (x + z)})
+	_prop("island_underside", Vector3(x * 2 + 1, -1.0 - radius * 1.2, z * 2 + 1), {"collide": false, "scale": radius * 0.7, "rot_y": 61.0 * (x + z)})
 
 func _bridge(from: Vector2i, to: Vector2i, id: int) -> void:
 	var direction: Vector2i = (to - from).sign()
@@ -97,15 +108,20 @@ func _bridge(from: Vector2i, to: Vector2i, id: int) -> void:
 		markers["bridge_%d_look" % id] = at + Vector3(direction.x, 0, direction.y) * 2
 		_prop("petal_cairn", at + Vector3(0.72, 0, 0.0), {"collide": false})
 		lights.append({"pos": at + Vector3(0.7, 0.6, 0), "color": WARM, "energy": 0.9, "radius": 5.0})
+	if id != -2:
+		if not _trails.is_empty() and _trails[-1][-1] == from:
+			_trails[-1].append(to)
+		else:
+			_trails.append([from, to])
 	for i: int in count + 1:
 		var cell: Vector2i = from + direction * i
 		if _grid[cell.y][cell.x] != " ":
 			continue
 		_grid[cell.y][cell.x] = "B"
-		var at: Vector3 = Vector3(cell.x * 2 + 1, 0, cell.y * 2 + 1)
-		_prop("papel_picado_bridge", at + Vector3(0, -0.035, 0), {"collide": false})
-		if id != -2:
-			markers["path_%d" % markers.size()] = at
+		# El papel resplandece por sí mismo (luz horneada): el puente se lee desde lejos en la
+		# niebla, igual en los ramales falsos; lo que distingue el camino son los pétalos.
+		if (cell.x + cell.y) % 2 == 0:
+			lights.append({"pos": Vector3(cell.x * 2 + 1, 0.8, cell.y * 2 + 1), "color": MAGENTA, "energy": 0.55, "radius": 4.5})
 
 func _prop(model: String, at: Vector3, extra: Dictionary = {}) -> void:
 	var prop: Dictionary = {"model": model, "pos": at}
@@ -189,9 +205,24 @@ func _dress() -> void:
 	lights.append({"pos": altar + Vector3(0, 1.0, 0.6), "color": WARM, "energy": 1.4, "radius": 9.0})
 	lights.append({"pos": altar + Vector3(0, 2.2, 1.0), "color": MAGENTA, "energy": 0.5, "radius": 7.0})
 
-	# 5. Isla de la puerta: nada más que la puerta. El neón baña de magenta el final del puente.
+	# 5. Isla de la puerta: el roble monumental entre veladoras y flores, con el eje libre. El
+	# neón baña de magenta el final del puente; las guirnaldas del último tramo llevan hasta él.
 	var door: Vector3 = markers["door"]
 	_prop("sign_wall", markers["d15"], {"rot_y": 180.0, "collide": false})
+	for side: float in [-1.0, 1.0]:
+		_prop("ofrenda_tier", door + Vector3(side * 2.9, 0, -0.6), {"rot_y": 90.0, "collide": false})
+		_prop("sugar_skull", door + Vector3(side * 2.75, 0.45, -0.9), {"rot_y": 180.0 - side * 25.0, "collide": false})
+		_prop("copal_censer", door + Vector3(side * 2.95, 0.45, -0.2), {"collide": false})
+		_prop("marigold_vase", door + Vector3(side * 1.75, 0, -0.5), {"collide": false})
+		_prop("marigold_pile", door + Vector3(side * 3.6, 0, -2.4), {"rot_y": side * 55.0, "collide": false})
+		_prop("stalagmite", door + Vector3(side * 3.9, 0, 1.6), {"rot_y": side * 40.0, "scale": 1.4, "collide": false})
+		_prop("papel_picado_string", door + Vector3(side * 3.1, 3.3, -0.4), {"rot_y": side * 22.0, "scale": 1.7, "collide": false})
+		_candles(rng, door + Vector3(side * 2.2, 0, -1.6), 14, Vector2(0.55, 1.5))
+		lights.append({"pos": door + Vector3(side * 2.3, 0.9, -1.4), "color": WARM, "energy": 1.1, "radius": 5.5})
+	# Guirnaldas sobre el último puente, cada vez más juntas: el corredor festivo hacia la salida.
+	for z: float in [84.0, 97.0, 108.0, 117.0, 125.0, 131.0, 136.0]:
+		# Altas, como un dosel: desde el puente el neón (4,3 m) se ve siempre por debajo de ellas.
+		_prop("papel_picado_string", Vector3(61, 6.2 + 0.3 * sin(z), z), {"rot_y": 6.0 * sin(z * 1.7), "scale": 2.6, "collide": false})
 	lights.append({"pos": door + Vector3(0, 3.6, -1.6), "color": MAGENTA, "energy": 1.8, "radius": 13.0})
 	lights.append({"pos": door + Vector3(0, 1.0, -8.0), "color": MAGENTA, "energy": 0.6, "radius": 9.0})
 
@@ -200,7 +231,28 @@ func _dress() -> void:
 	_prop("candle_tall", Vector3(62.0, 0, 48.4), {"collide": false})
 	lights.append({"pos": Vector3(62.0, 0.6, 48.6), "color": WARM, "energy": 0.7, "radius": 5.0})
 
+	# 7. Islotes inalcanzables a distintas alturas: roca, un marco de puerta con su luz, algún
+	# mueble. Dan escala al vacío y dicen que hubo más oficinas que cayeron aquí.
+	var islets: Array[Vector3] = [Vector3(26, -3, 8), Vector3(-7, -2, 30), Vector3(32, 3, 57), Vector3(2, 4, 66),
+		Vector3(80, -3, 58), Vector3(44, 4, 86), Vector3(79, 3, 97), Vector3(45, -2, 112), Vector3(80, 5, 124), Vector3(41, 6, 135)]
+	for index: int in islets.size():
+		_islet(islets[index], index)
 	_scatter_void(rng)
+
+
+## Islote escénico (sin suelo ni colisión): roca colgante, marco de puerta iluminado y un mueble.
+func _islet(at: Vector3, index: int) -> void:
+	var yaw: float = 47.0 * index
+	var turn: Basis = Basis(Vector3.UP, deg_to_rad(yaw))
+	_prop("island_underside", at, {"collide": false, "scale": 2.4, "rot_y": yaw})
+	var frame: Vector3 = at + turn * Vector3(0.5, 0, -0.3)
+	_prop("door_frame_lone", frame, {"collide": false, "rot_y": yaw})
+	_prop("ceiling_fixture", frame + Vector3(0, 2.32, 0), {"collide": false, "rot_y": yaw})
+	_prop(["filing_cabinet", "desk_office", "water_cooler", "chair_office"][index % 4], at + turn * Vector3(-1.2, 0, 0.5), {"collide": false, "rot_y": yaw + 20.0})
+	if index % 2 == 0:
+		_prop("candle_tall", at + turn * Vector3(0.9, 0, 0.9), {"collide": false, "scale": 1.3})
+		lights.append({"pos": at + turn * Vector3(0.9, 0.7, 1.1), "color": Color(1.0, 0.1, 0.08), "energy": 1.3, "radius": 6.0})
+	lights.append({"pos": frame + Vector3(0, 1.9, 0) + turn * Vector3(0, 0, 0.5), "color": Color(1.0, 0.9, 0.7), "energy": 1.4, "radius": 6.5, "flicker": index % 3 == 0})
 
 
 ## Restos de oficina a la deriva en el vacío, a alturas distintas, fuera de los caminos. Unos
@@ -225,7 +277,7 @@ func _scatter_void(rng: RandomNumberGenerator) -> void:
 			_prop("ceiling_fixture", at + Vector3(0, 2.6, 0), {"tilt": Vector3(0, 0, 14), "collide": false})
 			lights.append({"pos": at + Vector3(0, 2.0, 0), "color": Color(0.8, 0.9, 1.0), "energy": 1.0, "radius": 6.0, "flicker": true})
 		else:
-			lights.append({"pos": at + Vector3(0, 2.5, 1.5), "color": Color(0.4, 0.32, 0.8), "energy": 0.9, "radius": 7.0})
+			lights.append({"pos": at + Vector3(0, 2.5, 1.5), "color": Color(0.6, 0.2, 0.42), "energy": 0.9, "radius": 7.0})
 
 
 ## ¿Hay suelo (isla o puente) a menos de `margin` metros en planta?

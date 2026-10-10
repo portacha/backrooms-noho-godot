@@ -1,7 +1,9 @@
 extends LevelBase
 ## El Pasaje de las Calaveras: agua, refugios y cazador con presupuesto por tramo.
 
-const WATER_LEVEL: float = 0.14
+## Por debajo del suelo seco: el agua corre por un cauce hundido (`level3_def.gd`, BED/SURFACE).
+const WATER_LEVEL: float = -0.06
+const WATER_LINE: String = "¿Por qué sigo sintiendo el agua en mis pies?"
 
 var altar: LetterAltar = null
 var drained: bool = false
@@ -12,6 +14,10 @@ var _last_state: StringName = &"Wander"
 var _last_position: Vector3 = Vector3.ZERO
 var _finishing: bool = false
 var _water: Node3D = null
+var _water_material: ShaderMaterial = null
+var _wake: float = 0.0
+var _carpet_steps: int = 0
+var _asked_about_water: bool = false
 var _wall: Node3D = null
 var _broken: Node3D = null
 var _wall_collision: CollisionShape3D = null
@@ -30,8 +36,10 @@ func _ready() -> void:
 	player.sprint_enabled = true
 	set_touch_button(&"flashlight_visible", true)
 	set_touch_button(&"sprint_visible", true)
-	fog_real_color = Color(0.026, 0.066, 0.076)
-	fog_real_density = 0.042
+	# Niebla cerrada (tipo Silent Hill): la calavera siguiente apenas se adivina a 16 m.
+	fog_real_color = Color(0.085, 0.125, 0.135)
+	fog_real_density = 0.11
+	add_mist(Color(0.085, 0.125, 0.135), 0.55, 20, 13.0)
 	_build_water()
 	_build_wall()
 	for id: String in ["d10", "d11", "d12"]:
@@ -54,6 +62,7 @@ func _ready() -> void:
 	spawn_entity("res://resources/entity/profile_level3.tres")
 	entity.state_changed.connect(_on_state_changed)
 	player.noise_made.connect(_on_noise)
+	player.footstep.connect(_on_footstep)
 	var saved: String = spawn_at_checkpoint("start", PI)
 	# Estado de realidad que corresponde al punto de reaparición.
 	set_reality(0.0)
@@ -83,6 +92,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	super(delta)
 	_update_reality(delta)
+	_update_wake(delta)
 	update_letter_fx(altar)
 	if not hunter_started and player.global_position.z >= marker("hunter_gate").z:
 		hunter_started = true
@@ -150,15 +160,22 @@ func _update_reality(delta: float) -> void:
 		glimpse_reality(1.0 - roundf(reality), randf_range(0.25, 0.7))
 
 
-## Agua: una malla a ras de 0,14 m sobre las celdas inundadas. Como no pasa por el horneado, su
+## Agua: una malla 6 cm por debajo del suelo seco, sobre el cauce hundido de las celdas inundadas. Como no pasa por el horneado, su
 ## "reflejo" se calcula aquí por vértice con las mismas luces que horneó el constructor.
 func _build_water() -> void:
 	var material: ShaderMaterial = ShaderMaterial.new()
 	material.shader = load("res://shaders/water_surface.gdshader") as Shader
 	material.set_shader_parameter("petals_tex", load("res://assets/textures/water_marigold.png"))
 	material.set_shader_parameter("carpet_tex", load("res://assets/textures/backrooms_carpet.png"))
+	material.set_shader_parameter("bed_tex", load("res://assets/textures/tunnel_floor_silt.png"))
 	var lights: Array = geo.get_meta("lights", [])
 	var size: float = geo.get_meta("cell_size")
+	var rows: PackedStringArray = geo.get_meta("rows")
+	material.set_shader_parameter("ripple_tex", WaterMaps.ripples())
+	material.set_shader_parameter("ceiling_tex", WaterMaps.ceiling(rows, size, lights))
+	material.set_shader_parameter("map_origin", Vector2(geo.global_position.x, geo.global_position.z))
+	material.set_shader_parameter("map_size", Vector2(rows[0].length(), rows.size()) * size)
+	_water_material = material
 	var tool: SurfaceTool = SurfaceTool.new()
 	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for cell: Vector2i in zone_cells("water"):
@@ -177,6 +194,29 @@ func _build_water() -> void:
 	add_child(surface)
 	surface.global_position = geo.global_position + Vector3(0.0, WATER_LEVEL, 0.0)
 	_water = surface
+
+
+## Anillos alrededor de quien camina: crecen con la velocidad y se apagan al quedarse quieto.
+func _update_wake(delta: float) -> void:
+	var speed: float = Vector3(player.velocity.x, 0.0, player.velocity.z).length()
+	var target: float = clampf(speed / player.walk_speed, 0.0, 1.6) if player.in_water else 0.0
+	_wake = move_toward(_wake, target, delta * (3.0 if target > _wake else 0.6))
+	var at: Vector3 = player.global_position
+	_water_material.set_shader_parameter("wake", Vector3(at.x, at.z, _wake))
+
+
+## La mente pone la alfombra, pero los pies siguen mojados: el chapoteo se conserva en backrooms.
+## A la tercera pisada sobre "alfombra" el oficinista se lo pregunta, una sola vez.
+func _on_footstep(_radius: float) -> void:
+	if _asked_about_water:
+		return
+	if not player.in_water or reality > 0.05:
+		_carpet_steps = 0
+		return
+	_carpet_steps += 1
+	if _carpet_steps >= 3 and not hud.is_reading and entity.current_state() not in [&"Chase", &"Attack"]:
+		_asked_about_water = true
+		hud.show_line(WATER_LINE, 4.5)
 
 
 ## Luz que llega a un punto del agua (sin oclusión: el túnel ya separa unas luces de otras).
@@ -285,7 +325,7 @@ func _open_wall() -> void:
 	player.in_water = false
 	drained = true
 	var tween: Tween = create_tween()
-	tween.tween_property(_water, "position:y", -0.3, 2.6)
+	tween.tween_property(_water, "position:y", -0.34, 2.6)
 	tween.tween_callback(_water.hide)
 
 

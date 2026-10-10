@@ -334,8 +334,6 @@ func _physics_process(delta: float) -> void:
 	stimulus = maxf(0.0, stimulus - Game.difficulty.stimulus_decay * delta)
 	if has_sight and not manifested:
 		add_stimulus(Game.difficulty.stimulus_sight_per_second * delta, player.global_position)
-	if player.is_hyperventilating and distance < 15.0 * radius_scale():
-		add_stimulus(8.0 * delta, player.global_position)
 	_update_light(delta, distance)
 	if current_state() == &"Ambush":
 		return

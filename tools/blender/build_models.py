@@ -37,26 +37,32 @@ SPECS = {
     'planter': ((.58,.69,1.24),240),
     'letter_o': ((.5,.1,.62),200), 'letter_h': ((.5,.1,.62),140),
     'column_capital': ((1.6,1.6,.5),220), 'column_base': ((1.5,1.5,.35),220),
-    'ofrenda_arch': ((2.4,.5,2.6),1100), 'ofrenda_tier': ((2.,1.,.45),260),
-    'papel_picado_string': ((2.,.03,.45),260), 'sugar_skull': ((.2,.24,.22),600),
-    'pan_de_muerto': ((.22,.22,.1),120), 'copal_censer': ((.2,.2,.26),240),
-    'marigold_vase': ((.3,.3,.5),360), 'marigold_pile': ((.9,.9,.18),700),
+    'ofrenda_arch': ((2.4,.5,2.6),2600), 'ofrenda_tier': ((2.,1.,.45),260),
+    'papel_picado_string': ((2.,.03,.45),260), 'sugar_skull': ((.2,.24,.22),1400),
+    'pan_de_muerto': ((.22,.22,.1),450), 'copal_censer': ((.2,.2,.26),800),
+    'marigold_vase': ((.3,.3,.5),800), 'marigold_pile': ((.9,.9,.18),900),
     'photo_frame_empty': ((.18,.08,.25),100), 'adobe_rubble': ((1.3,.9,.6),400),
-    'stone_stele': ((.9,.35,1.7),600), 'wallpaper_peel': ((1.2,.06,1.4),100),
-    'cabinet_rusty_stack': ((.5,.62,2.66),700), 'sugar_skull_giant': ((1.4,1.3,1.1),600),
+    'stone_stele': ((.9,.35,1.7),1200), 'wallpaper_peel': ((1.2,.06,1.4),100),
+    'cabinet_rusty_stack': ((.5,.62,2.66),700), 'sugar_skull_giant': ((1.4,1.3,1.1),3000),
     'pipe_run': ((2.,.2,.3),360), 'pipe_elbow_valve': ((.5,.3,.6),260),
     'duct_grille': ((1.9,.08,1.3),220), 'ledge_walkway': ((2.,.6,.25),280),
     'marigold_raft': ((.7,.7,.07),340), 'wallet_open': ((.2,.1,.03),220),
-    'clay_wall_panel': ((2.,.25,2.7),500), 'clay_pot_black': ((.4,.4,.45),240),
-    'clay_wall_broken': ((2.,.4,2.7),500), 'drain_grate': ((.8,.8,.04),160),
-    'oak_door_monumental': ((2.6,.5,3.8),1600), 'oak_door_open': ((2.6,1.4,3.8),1600),
+    'clay_wall_panel': ((2.,.25,2.7),2600), 'clay_pot_black': ((.4,.4,.45),800),
+    'clay_wall_broken': ((2.,.4,2.7),2600), 'drain_grate': ((.8,.8,.04),160),
+    'oak_door_monumental': ((2.6,.5,3.8),3000), 'oak_door_open': ((2.6,1.4,3.8),3000),
     'neon_noho_sign': ((2.8,.12,.8),360), 'papel_picado_bridge': ((2.,2.,.06),340),
-    'island_underside': ((2.,2.,1.6),320), 'stalagmite': ((.7,.7,1.9),180),
+    'island_underside': ((2.,2.,1.6),1600), 'stalagmite': ((.7,.7,1.9),500),
     'emergency_beacon': ((.22,.22,.3),140), 'door_frame_lone': ((1.2,.16,2.2),260),
     'petal_cairn': ((.5,.5,.35),360), 'badge_noho': ((.086,.012,.13),280),
 }
 # Las medidas nominales excluyen asa, pies de partición y solapas abiertas.
 MATS = {}
+# Los constructores originales siguen disponibles como fallback explícito.
+MESHY_SOURCED = {
+    'sugar_skull','sugar_skull_giant','ofrenda_arch','clay_wall_panel','clay_wall_broken','copal_censer',
+    'marigold_vase','pan_de_muerto','clay_pot_black','marigold_pile','stone_stele','island_underside','stalagmite',
+}
+MESHY_MATERIAL_LIMITS = {name: 8 for name in ('sugar_skull','sugar_skull_giant','ofrenda_arch','clay_wall_panel','clay_wall_broken','copal_censer')}
 # Letreros y piezas de pared: cuelgan de pared o techo, su origen no va al suelo.
 SIGNS = ('sign_wall','sign_wall_right','sign_wall_left','sign_hanging','frame_small','logo_plate',
          'wallpaper_peel','pipe_run','pipe_elbow_valve','duct_grille','clay_wall_panel','clay_wall_broken',
@@ -979,7 +985,8 @@ def validate(name):
         print(f'BODY {name}: {tuple(round(v,4) for v in checked)} m; nominal={expected}',flush=True)
     print(f'MODEL {name}: {tris}/{budget} tris; bbox={tuple(round(v,4) for v in size)} m; materials={sorted(names)}',flush=True)
     if names-set(PALETTE): raise ValueError(f'{name}: materiales fuera de paleta')
-    if len(names)>5: raise ValueError(f'{name}: demasiados materiales ({len(names)}>5)')
+    material_limit=MESHY_MATERIAL_LIMITS.get(name,6 if name in MESHY_SOURCED else 5)
+    if len(names)>material_limit: raise ValueError(f'{name}: demasiados materiales ({len(names)}>{material_limit})')
     if tris>budget: raise ValueError(f'{name}: presupuesto excedido ({tris}>{budget})')
     if any(abs(a-b)/b>.15 for a,b in zip(checked,expected)):
         raise ValueError(f'{name}: dimensiones {checked}, esperadas {expected}')
@@ -1010,7 +1017,13 @@ def fit_nominal_bounds(name):
 
 
 def main():
-    names=sys.argv[sys.argv.index('--')+1:] if '--' in sys.argv else list(SPECS)
+    args=sys.argv[sys.argv.index('--')+1:] if '--' in sys.argv else []
+    script_fallback='--script-fallback' in args
+    args=[arg for arg in args if arg!='--script-fallback']
+    names=args if args else (list(SPECS) if script_fallback else [name for name in SPECS if name not in MESHY_SOURCED])
+    blocked=set(names)&MESHY_SOURCED
+    if blocked and not script_fallback:
+        raise ValueError(f'Modelos de Meshy protegidos; usa --script-fallback para regenerar: {sorted(blocked)}')
     unknown=set(names)-set(BUILDERS)
     if unknown: raise ValueError(f'Modelos desconocidos: {sorted(unknown)}')
     bpy.context.scene.unit_settings.system='METRIC'

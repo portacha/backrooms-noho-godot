@@ -41,7 +41,9 @@ Cada decisión de este documento se valida contra esa frase. Si un feedback, un 
 
 Regla: el jugador debe poder **leer la linterna sin mirar ningún HUD**. El parpadeo es la interfaz.
 
-### 3.3 Resistencia (invisible, presente)
+### 3.3 Resistencia (invisible, presente) — retirada
+
+> **Enmienda 2026-10-09 (prevalece):** se retiran la **resistencia** y los **niveles de dificultad**. El jugador corre siempre que quiera, sin consumo, jadeo ni señales de cansancio; el precio de correr es solo el **ruido**. Hay una única dificultad, el **ajuste estándar** (los valores "Intermedio" de `docs/12`, en `scripts/core/difficulty.gd`). Añadir perfiles se decidirá cuando el estándar esté afinado. Tampoco hay selector de dificultad en el menú (§5), en la pausa ni en opciones (§8): esas menciones quedan sin efecto.
 
 Sin barra jamás (`docs/03`). Se comunica por: respiración (audio pre-renderizado por intensidad), oscilación sutil de cámara, y oscurecimiento periférico leve al agotarse (<20 u). En **Fácil** (resistencia ∞) estos cues desaparecen por completo, no se desactivan a medias.
 

@@ -1,6 +1,6 @@
 class_name EntityProfile
 extends Resource
-## Disparadores por nivel; las magnitudes provienen de Game.difficulty.
+## Disparadores por nivel; las magnitudes provienen del ajuste estándar, Game.difficulty.
 enum LightReaction { NONE, AMBUSH, INVESTIGATE }
 @export var wander_enabled: bool = true
 @export var investigate_enabled: bool = true

@@ -1,7 +1,7 @@
 class_name PauseMenu
 extends CanvasLayer
 ## Pausa real de un jugador offline: congela todo y atenúa (docs/13 §6.2).
-## Reanudar · Dificultad · Opciones · Menú principal. Nunca redirige a la marca.
+## Reanudar · Opciones · Menú principal. Nunca redirige a la marca.
 
 signal paused
 signal resumed
@@ -17,7 +17,6 @@ var _is_paused: bool = false
 var _volume_tween: Tween = null
 
 @onready var _resume_button: Button = $Center/Card/Margin/Column/ResumeButton
-@onready var _difficulty_selector: DifficultySelector = $Center/Card/Margin/Column/DifficultySelector
 @onready var _options_button: Button = $Center/Card/Margin/Column/OptionsButton
 @onready var _menu_button: Button = $Center/Card/Margin/Column/MenuButton
 @onready var _title: Label = $Center/Card/Margin/Column/Title
@@ -66,7 +65,6 @@ func pause_game() -> void:
 	get_tree().paused = true
 	visible = true
 	_refresh_touch_button()
-	_difficulty_selector.refresh()
 	_duck_audio()
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	_resume_button.call_deferred("grab_focus")

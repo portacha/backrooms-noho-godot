@@ -5,14 +5,12 @@ var _fails: int = 0
 var _target: String = ""
 var _cross_time: float = 0.0
 var _game_time: float = 0.0
-var _difficulty_backup: int = 0
 var _completed: bool = false
 
 func _process(delta: float) -> void:
 	_game_time += delta
 
 func _ready() -> void:
-	_difficulty_backup = int(Game.setting("difficulty"))
 	await get_tree().process_frame
 	get_tree().current_scene = null
 	Game.scene_changing.connect(func(path: String) -> void: _target = path)
@@ -23,8 +21,6 @@ func _ready() -> void:
 	_check(_completed, "la prueba completa terminó sin abortar")
 	print("LEVEL4 TEST %s (%d fallos)" % ["OK" if _fails == 0 else "FAIL", _fails])
 	Game.finish_game()
-	Game.set_setting("difficulty", _difficulty_backup)
-	Game.difficulty = Difficulty.make(_difficulty_backup as Difficulty.Id)
 	get_tree().quit(_fails)
 
 func _check(ok: bool, label: String) -> void:
@@ -40,9 +36,6 @@ func _run() -> void:
 		_check(false, "falta reconstruir la geometría del Nivel 4")
 		return
 	Game.finish_game()
-	var diff_id: Difficulty.Id = OS.get_environment("LEVEL4_DIFFICULTY").to_int() as Difficulty.Id if not OS.get_environment("LEVEL4_DIFFICULTY").is_empty() else Difficulty.Id.NORMAL
-	Game.set_setting("difficulty", diff_id)
-	Game.difficulty = Difficulty.make(diff_id)
 	Game.goto_scene(Game.LEVEL_4_SCENE)
 	await _wait(2.0)
 	var level: LevelBase = get_tree().current_scene as LevelBase
@@ -83,15 +76,15 @@ func _run() -> void:
 	player.respawn_at(level.marker("door"), PI)
 	await _wait(0.2)
 	_check(not bool(level.get("crossing")), "puerta bloqueada antes de la O")
-	var paths: Array = level.get("_paths")
-	_check(paths.size() > 40, "sendero seguro segmentado")
-	var path: MeshInstance3D = paths[0] as MeshInstance3D
-	var reveal_index: int = 0
+	var trail: PackedVector3Array = level.get("_trail_points")
+	_check(trail.size() > 40, "sendero seguro muestreado")
+	var reveal_index: int = 6
+	var petals_at: Vector3 = trail[reveal_index]
 	_check(float((level.get("_reveals") as PackedFloat32Array)[reveal_index]) == 0.0, "pétalos invisibles sin linterna")
-	player.respawn_at(path.global_position + Vector3(0, -0.025, -2), PI)
+	player.respawn_at(Vector3(petals_at.x, 0.0, petals_at.z - 2.0), PI)
 	player.flashlight.turn(true)
 	await _wait(0.1)
-	player.steer_look(path.global_position, 1.0)
+	player.steer_look(petals_at, 1.0)
 	await _wait(0.7)
 	_check(float((level.get("_reveals") as PackedFloat32Array)[reveal_index]) > 0.8, "el haz revela pétalos")
 	player.flashlight.turn(false)
@@ -123,7 +116,6 @@ func _run() -> void:
 	level.connect("door_crossed", func() -> void: _cross_time = _game_time)
 	var letter: Vector3 = level.marker("letter")
 	player.respawn_at(Vector3(letter.x, 0, letter.z - 1.4), PI)
-	player.stamina = 5.0
 	await _wait(0.1)
 	player.steer_look(letter, 1.0)
 	await _wait(0.2)
@@ -133,7 +125,6 @@ func _run() -> void:
 	_check(altar.is_taken and not player.controls_enabled, "ritual por interacción sostenida")
 	await _wait(3.3)
 	_check(bool(level.get("chase_started")) and entity.enraged and player.controls_enabled, "furia y carrera final")
-	_check(player.stamina > 95.0, "ritual regala resistencia completa")
 	var budget: float = 25.0
 	Input.action_press("sprint")
 	Input.action_press("move_forward")

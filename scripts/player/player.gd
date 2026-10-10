@@ -1,22 +1,18 @@
 class_name Player
 extends CharacterBody3D
-## Jugador en primera persona: caminar, correr (resistencia invisible) y mirar.
-## Valores por defecto = perfil Intermedio (docs/12 §3.1 y §4.4). Feel: docs/13 §3–§4.
+## Jugador en primera persona: caminar, correr y mirar. Correr no cuesta: no hay resistencia;
+## su precio es el ruido (docs/12 §3). Feel: docs/13 §3–§4.
 ## El agachado es automático, sin botón (docs/03): lo fijan los niveles con `set_crouched`.
 
 ## Emitida en cada paso; el radio audible alimenta el sistema de estímulos (docs/12 §3.3).
 signal footstep(noise_radius: float)
 ## Lo mismo que `footstep`, con la posición: la oye la entidad sin conocer al jugador.
 signal noise_made(radius: float, at: Vector3)
-signal hyperventilation_changed(active: bool)
-## 0 = bien, 1 = agotado; el nivel pinta con esto el oscurecimiento periférico.
-signal exhaustion_changed(ratio: float)
 
 const MOBILE_FOV: float = 70.0
 const DESKTOP_FOV: float = 75.0
 const PITCH_LIMIT: float = deg_to_rad(85.0)
 const SETTLE_TIME: float = 0.2
-const BREATH_SILENT_DB: float = -60.0
 ## Alturas de cámara de pie y agachado; la transición tarda 0,25 s.
 const STAND_HEAD_HEIGHT: float = 1.65
 const CROUCH_HEAD_HEIGHT: float = 0.9
@@ -33,24 +29,9 @@ const STILL_SPEED: float = 0.3
 ## El prólogo se juega sin sprint (docs/12 §8.0).
 @export var sprint_enabled: bool = true
 
-@export_group("Resistencia")
-@export var max_stamina: float = 100.0
-## Perfil Intermedio: ~5 s de carrera continua (docs/12 §3.1).
-@export var sprint_drain: float = 20.0
-@export var regen_idle: float = 12.0
-@export var regen_walking: float = 6.0
-## Solo el agotamiento real dispara el jadeo fuerte; el cansancio previo avisa suave.
-@export var hyperventilation_threshold: float = 20.0
-@export var hyperventilation_linger: float = 2.5
-## Toques cortos de sprint (< gracia) no consumen: reposicionarse no cansa.
-@export var sprint_grace_seconds: float = 0.8
-## Perfil Fácil: sin consumo y sin señales de cansancio (docs/12 §4.4, docs/13 §3.3).
-@export var infinite_stamina: bool = false
-
 @export_group("Ruido")
 @export var walk_noise_radius: float = 5.0
 @export var sprint_noise_radius: float = 14.0
-@export var hyperventilation_noise_factor: float = 1.5
 
 @export_group("Agachado (automático, sin botón)")
 @export var crouch_speed_factor: float = 0.55
@@ -80,22 +61,8 @@ const STILL_SPEED: float = 0.3
 
 @export_group("Audio")
 @export var footstep_sounds: Array[AudioStream] = []
-## Mezcla de terror: la respiración vive DEBAJO de pasos/ambiente, nunca encima.
-## -6 dB la ponía como protagonista; -16 dB la deja presente sin enmascarar.
-@export var breath_max_db: float = -16.0
-## Cansancio previo: audible pero íntimo, sin penalizar sigilo.
-@export var breath_tired_db: float = -28.0
-@export var breath_tired_threshold: float = 65.0
-## Fades orgánicos (dB/s): entrada lenta, cola natural. Sin pitch ni filtros
-## (Web = todo pre-renderizado, docs/13 §9): solo automatización de volumen.
-@export var breath_fade_in_db: float = 8.0
-@export var breath_fade_out_db: float = 12.0
 
-var stamina: float = 100.0
-## Escala del consumo al correr; la carrera final la ajusta a su duración (docs/12 §8.4).
-var stamina_drain_scale: float = 1.0
 var is_sprinting: bool = false
-var is_hyperventilating: bool = false
 ## Agachado por el entorno (conductos, ofrendas): sin botón, sin sprint.
 var is_crouched: bool = false
 ## Falso mientras se lee un documento: sin movimiento, mirada ni interacción.
@@ -109,14 +76,10 @@ var _pitch: float = 0.0
 var _stride_phase: float = 0.0
 var _motion_weight: float = 0.0
 var _sprint_weight: float = 0.0
-var _linger_left: float = 0.0
 var _last_step_index: int = -1
 var _head_height: float = 0.0
 var _target_head_height: float = STAND_HEAD_HEIGHT
 var _has_move_input: bool = false
-var _sprint_time: float = 0.0
-var _sway_time: float = 0.0
-var _last_exhaustion: float = -1.0
 var _water_step_sounds: Array[AudioStream] = []
 var _splash_sounds: Array[AudioStream] = []
 var _base_mouse_sensitivity: float = 0.25
@@ -127,7 +90,6 @@ var _base_reduced_motion: bool = false
 @onready var _camera: Camera3D = $Head/Camera3D
 @onready var _collision_shape: CollisionShape3D = $CollisionShape3D
 @onready var _footstep_player: AudioStreamPlayer = $FootstepPlayer
-@onready var _breath_player: AudioStreamPlayer = $BreathPlayer
 @onready var interactor: Interactor = $Interactor
 @onready var flashlight: Flashlight = $Head/Camera3D/Flashlight
 @onready var head: Node3D = $Head
@@ -135,7 +97,6 @@ var _base_reduced_motion: bool = false
 
 
 func _ready() -> void:
-	stamina = max_stamina
 	# La cápsula se deforma al agacharse: se duplica para no tocar la escena.
 	_collision_shape.shape = (_collision_shape.shape as CapsuleShape3D).duplicate()
 	_load_water_sounds()
@@ -145,10 +106,8 @@ func _ready() -> void:
 	_head_height = _head.position.y
 	_target_head_height = _head_height
 	_camera.fov = MOBILE_FOV if _is_touch_device() else DESKTOP_FOV
-	_breath_player.volume_db = BREATH_SILENT_DB
-	_apply_difficulty()
+	_apply_tuning()
 	_apply_settings()
-	Game.difficulty_changed.connect(_apply_difficulty)
 	Game.settings_changed.connect(_apply_settings)
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
@@ -165,7 +124,6 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	_sway_time += delta
 	var input: Vector2 = Vector2.ZERO
 	if controls_enabled:
 		input = Input.get_vector("move_left", "move_right", "move_forward", "move_back")
@@ -174,7 +132,6 @@ func _physics_process(delta: float) -> void:
 	_has_move_input = moving
 
 	_update_sprint(moving)
-	_update_stamina(moving, delta)
 
 	var speed: float = sprint_speed if is_sprinting else walk_speed
 	if is_crouched:
@@ -191,7 +148,6 @@ func _physics_process(delta: float) -> void:
 	_head_height = move_toward(_head_height, _target_head_height, CROUCH_TRANSITION_SPEED * delta)
 	_update_steps(delta)
 	_update_camera(delta)
-	_update_breath(delta)
 
 
 ## Giro de cámara en píxeles de arrastre. Lo usan el ratón y el arrastre táctil (docs/03).
@@ -223,7 +179,6 @@ func set_cutscene(active: bool) -> void:
 	set_physics_process(not active)
 	if active:
 		velocity = Vector3.ZERO
-		_breath_player.stop()
 
 
 ## Agacharse automático (sin botón): lo activan los conductos del nivel.
@@ -249,15 +204,6 @@ func is_hidden() -> bool:
 	return is_crouched and dark and still
 
 
-## Regalo del ritual de la letra (docs/12 §8.4): resistencia llena y jadeo fuera.
-func restore_stamina() -> void:
-	stamina = max_stamina
-	_linger_left = 0.0
-	_set_hyperventilating(false)
-	_last_exhaustion = -1.0
-	_push_exhaustion()
-
-
 ## Recoloca tras una caída al vacío (N4): posición, mirada y velocidad a cero.
 func respawn_at(at: Vector3, yaw: float) -> void:
 	global_position = at
@@ -277,21 +223,14 @@ func _look(relative: Vector2) -> void:
 	_head.rotation.x = _pitch
 
 
-## Resistencia, regeneración y radios de ruido salen de `Game.difficulty` (docs/12 §4.4).
-func _apply_difficulty() -> void:
+## Los radios de ruido salen del ajuste estándar, `Game.difficulty` (docs/12 §4).
+func _apply_tuning() -> void:
 	var d: Difficulty = Game.difficulty
-	infinite_stamina = d.infinite_stamina
-	sprint_drain = d.sprint_drain
-	regen_idle = d.regen_idle
-	regen_walking = d.regen_walking
-	hyperventilation_noise_factor = d.hyperventilation_factor
 	walk_noise_radius = d.noise_walk
 	sprint_noise_radius = d.noise_sprint
 	water_walk_noise_radius = d.noise_water_walk
 	water_sprint_noise_radius = d.noise_water_sprint
 	crouch_noise_radius = d.noise_crouch
-	stamina = minf(stamina, max_stamina)
-	_push_exhaustion()
 
 
 ## Ajustes en vivo: sensibilidad, inversión, head-bob y movimiento reducido.
@@ -303,56 +242,8 @@ func _apply_settings() -> void:
 
 
 func _update_sprint(moving: bool) -> void:
-	var wants_sprint: bool = sprint_enabled and not is_crouched and moving and is_on_floor() and Input.is_action_pressed("sprint")
-	if is_sprinting:
-		is_sprinting = wants_sprint and stamina > 0.0
-	else:
-		# Tras agotarse hay que soltar y volver a pulsar: correr es un esfuerzo, no un dash.
-		is_sprinting = wants_sprint and stamina > 0.0 and Input.is_action_just_pressed("sprint")
-
-
-func _update_stamina(moving: bool, delta: float) -> void:
-	if infinite_stamina:
-		stamina = max_stamina
-		_sprint_time = 0.0
-		_set_hyperventilating(false)
-		return
-
-	if is_sprinting:
-		_sprint_time += delta
-		# Gracia inicial sin consumo: los toques cortos no castigan.
-		if _sprint_time > sprint_grace_seconds:
-			stamina = maxf(stamina - sprint_drain * stamina_drain_scale * delta, 0.0)
-	else:
-		_sprint_time = 0.0
-		var regen: float = regen_walking if moving else regen_idle
-		stamina = minf(stamina + regen * delta, max_stamina)
-
-	if stamina <= hyperventilation_threshold:
-		_linger_left = hyperventilation_linger
-		_set_hyperventilating(true)
-	elif is_hyperventilating and not is_sprinting:
-		_linger_left -= delta
-		if _linger_left <= 0.0:
-			_set_hyperventilating(false)
-	_push_exhaustion()
-
-
-func _push_exhaustion() -> void:
-	# En Fácil no hay señales de cansancio: ni respiración, ni oscilación, ni oscurecimiento.
-	if infinite_stamina:
-		return
-	var ratio_now: float = 1.0 - stamina / maxf(max_stamina, 0.01)
-	if absf(ratio_now - _last_exhaustion) > 0.005:
-		_last_exhaustion = ratio_now
-		exhaustion_changed.emit(ratio_now)
-
-
-func _set_hyperventilating(active: bool) -> void:
-	if is_hyperventilating == active:
-		return
-	is_hyperventilating = active
-	hyperventilation_changed.emit(active)
+	# Correr siempre que se quiera: sin resistencia que lo limite.
+	is_sprinting = sprint_enabled and not is_crouched and moving and is_on_floor() and Input.is_action_pressed("sprint")
 
 
 func _step_noise_radius() -> float:
@@ -363,8 +254,6 @@ func _step_noise_radius() -> float:
 		radius = water_sprint_noise_radius if is_sprinting else water_walk_noise_radius
 	else:
 		radius = sprint_noise_radius if is_sprinting else walk_noise_radius
-	if is_hyperventilating:
-		radius *= hyperventilation_noise_factor
 	return radius
 
 
@@ -433,32 +322,8 @@ func _update_camera(delta: float) -> void:
 	if not reduced_camera_motion:
 		# Un balanceo completo cada dos pasos (izquierda / derecha).
 		roll = sin(_stride_phase * PI) * deg_to_rad(sprint_roll_degrees) * _sprint_weight * _motion_weight
-		# Agotamiento: oscilación sutil que crece al vaciarse (en Fácil no existe).
-		if not infinite_stamina and stamina < max_stamina:
-			var exhaustion: float = 1.0 - stamina / max_stamina
-			roll += sin(_sway_time * 1.9) * 0.007 * exhaustion
 	_head.position.y = _head_height + bob
 	_camera.rotation.z = roll
-
-
-func _update_breath(delta: float) -> void:
-	var target_db: float = BREATH_SILENT_DB
-	if is_hyperventilating:
-		# Jadeo fuerte, pero mezclado 10 dB por debajo de antes: presencia sin grito.
-		target_db = breath_max_db
-	elif not infinite_stamina and stamina < breath_tired_threshold and (_has_move_input or is_sprinting):
-		# Cansancio progresivo: de silencio a íntimo (-28 dB) a medida que baja
-		# la resistencia. Avisa al cuerpo antes de penalizar al sigilo.
-		var span: float = breath_tired_threshold - hyperventilation_threshold
-		var tiredness: float = clampf((breath_tired_threshold - stamina) / maxf(span, 1.0), 0.0, 1.0)
-		target_db = lerpf(BREATH_SILENT_DB, breath_tired_db, tiredness)
-	var fade_speed: float = breath_fade_in_db if target_db > _breath_player.volume_db else breath_fade_out_db
-	_breath_player.volume_db = move_toward(_breath_player.volume_db, target_db, fade_speed * delta)
-	var audible: bool = _breath_player.volume_db > BREATH_SILENT_DB + 0.5
-	if audible and not _breath_player.playing:
-		_breath_player.play()
-	elif not audible and _breath_player.playing:
-		_breath_player.stop()
 
 
 func _is_touch_device() -> bool:

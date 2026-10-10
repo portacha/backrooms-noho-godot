@@ -18,6 +18,8 @@ El movimiento base del jugador es una **caminata lenta y deliberada**, donde cad
 
 ### Carrera (sprint) y resistencia
 
+> **Enmienda 2026-10-09 (prevalece):** se retiran la **resistencia** y los **niveles de dificultad**. El jugador corre siempre que quiera, sin consumo, jadeo ni señales de cansancio; el precio de correr es solo el **ruido**. Hay una única dificultad, el **ajuste estándar** (los valores "Intermedio" de `docs/12`, en `scripts/core/difficulty.gd`). Añadir perfiles se decidirá cuando el estándar esté afinado. Lo que sigue en este apartado queda como referencia histórica.
+
 Para situaciones de peligro inminente, el jugador dispone de una mecánica de **carrera ("sprint")** que consume una **barra de resistencia invisible**. Abusar de esta capacidad tiene consecuencias auditivas severas:
 
 - El personaje comenzará a **hiperventilar**, emitiendo jadeos pesados.

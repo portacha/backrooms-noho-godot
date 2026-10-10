@@ -1,8 +1,7 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/main_menu.gd" id="1_menu"]
 [ext_resource type="Texture2D" path="res://Portada.png" id="2_cover"]
-[ext_resource type="PackedScene" path="res://scenes/ui/difficulty_selector.tscn" id="3_selector"]
 [ext_resource type="PackedScene" path="res://scenes/ui/options_panel.tscn" id="4_options"]
 [ext_resource type="PackedScene" path="res://scenes/ui/credits_panel.tscn" id="5_credits"]
 
@@ -104,18 +103,6 @@ layout_mode = 2
 size_flags_horizontal = 0
 theme_override_font_sizes/font_size = 18
 text = "CONTINUAR"
-
-[node name="DifficultyCaption" type="Label" parent="LeftColumn"]
-layout_mode = 2
-mouse_filter = 2
-theme_override_colors/font_color = Color(1, 1, 1, 0.55)
-theme_override_font_sizes/font_size = 13
-text = "DIFICULTAD"
-
-[node name="DifficultySelector" parent="LeftColumn" instance=ExtResource("3_selector")]
-custom_minimum_size = Vector2(320, 48)
-layout_mode = 2
-size_flags_horizontal = 0
 
 [node name="OptionsButton" type="Button" parent="LeftColumn"]
 custom_minimum_size = Vector2(320, 52)

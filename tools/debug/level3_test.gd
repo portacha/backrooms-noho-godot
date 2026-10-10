@@ -22,8 +22,6 @@ func _ready() -> void:
 		get_tree().quit(1))
 	await get_tree().process_frame
 	get_tree().current_scene = null
-	Game.settings["difficulty"] = Difficulty.Id.NORMAL
-	Game.difficulty = Difficulty.make(Difficulty.Id.NORMAL)
 	Game.deaths_in_segment = 0
 	Game.checkpoint_scene = ""
 	Game.checkpoint_id = ""

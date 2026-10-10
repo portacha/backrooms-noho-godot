@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://scripts/player/player.gd" id="1_script"]
 [ext_resource type="AudioStream" path="res://assets/audio/sfx/footstep_shoe_01.wav" id="2_step"]
@@ -7,7 +7,6 @@
 [ext_resource type="AudioStream" path="res://assets/audio/sfx/footstep_shoe_04.wav" id="5_step"]
 [ext_resource type="AudioStream" path="res://assets/audio/sfx/footstep_shoe_05.wav" id="6_step"]
 [ext_resource type="AudioStream" path="res://assets/audio/sfx/footstep_shoe_06.wav" id="7_step"]
-[ext_resource type="AudioStream" path="res://assets/audio/sfx/breath_heavy_loop.ogg" id="8_breath"]
 
 [ext_resource type="Script" path="res://scripts/player/interactor.gd" id="9_interactor"]
 
@@ -51,10 +50,6 @@ stream = ExtResource("11_click")
 volume_db = -8.0
 
 [node name="FootstepPlayer" type="AudioStreamPlayer" parent="."]
-
-[node name="BreathPlayer" type="AudioStreamPlayer" parent="."]
-stream = ExtResource("8_breath")
-volume_db = -60.0
 
 [node name="Interactor" type="Node" parent="." node_paths=PackedStringArray("camera")]
 script = ExtResource("9_interactor")

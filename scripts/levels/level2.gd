@@ -39,8 +39,10 @@ func _ready() -> void:
 	player.camera.far = 120.0
 	set_touch_button(&"flashlight_visible", true)
 	set_touch_button(&"sprint_visible", true)
-	fog_real_color = Color(0.078, 0.054, 0.036)
-	fog_real_density = 0.03
+	# Niebla cerrada (tipo Silent Hill): la nave no se abarca de un vistazo.
+	fog_real_color = Color(0.13, 0.115, 0.1)
+	fog_real_density = 0.12
+	add_mist(Color(0.13, 0.115, 0.1), 0.55, 22, 14.0)
 	set_reality(0.0)
 
 	_build_documents()
@@ -164,7 +166,6 @@ func _light_offering(index: int, restoring: bool = false) -> void:
 	if ignite != null:
 		play_sound_at(ignite, _flames[index].global_position, -3.0, 20.0)
 	Game.caption("[la veladora prende]")
-	player.restore_stamina()
 	flicker_reality(1.0)
 	offering_lit.emit(index)
 	if lit_count == OFFERINGS:

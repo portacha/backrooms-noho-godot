@@ -65,7 +65,7 @@ func _run() -> void:
 	_check(Game.current_checkpoint() == "r2", "checkpoint r2 con las tres encendidas")
 	await _wait(4.2)
 	var altar: LetterAltar = level.get("altar") as LetterAltar
-	_check(altar != null and altar.scale.x > 0.9, "la pirámide despierta y aparece la O")
+	_check(altar != null and altar.size > 2.0, "la pirámide despierta y aparece la O")
 	var letter: Vector3 = level.call("marker", "letter")
 	var focused_letter: bool = await _hold(player, Vector3(letter.x, 0.0, letter.z + 4.2), letter, 1.8)
 	_check(focused_letter and altar.is_taken, "letra O recogida manteniendo")

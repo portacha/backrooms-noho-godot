@@ -1,25 +1,21 @@
 extends Node
 ## Prueba del jugador, la linterna y los ajustes. Uso:
 ##   tools/run_godot.sh --headless --path . res://tools/debug/player_test.tscn
-## Afirma perfiles de dificultad, agachado, ruido en agua, bandas de amenaza,
+## Afirma el ajuste estándar, sprint sin resistencia, agachado, ruido en agua, bandas de amenaza,
 ## cono de luz, kill/revive, sensibilidad e inversión. Imprime PLAYER TEST OK/FAIL.
 
 var _fails: int = 0
 var _blinks: int = 0
-var _exhaust_count: int = 0
 var _last_footstep: float = -1.0
 var _last_noise: float = -1.0
 var _saved_settings: Dictionary = {}
-var _saved_difficulty: Difficulty.Id = Difficulty.Id.NORMAL
 
 @onready var _player: Player = $Player
 
 
 func _ready() -> void:
 	_saved_settings = Game.settings.duplicate()
-	_saved_difficulty = Game.selected_difficulty()
 	_player.flashlight.flickered.connect(_on_blink)
-	_player.exhaustion_changed.connect(_on_exhaust)
 	_player.footstep.connect(_on_footstep)
 	_player.noise_made.connect(_on_noise)
 	await get_tree().physics_frame
@@ -27,7 +23,6 @@ func _ready() -> void:
 	await _run()
 	for key: String in _saved_settings:
 		Game.set_setting(key, _saved_settings[key])
-	Game.select_difficulty(_saved_difficulty)
 	Input.action_release("move_forward")
 	Input.action_release("sprint")
 	print("PLAYER TEST %s (%d fallos)" % ["OK" if _fails == 0 else "FAIL", _fails])
@@ -44,8 +39,6 @@ func _on_blink(_strength: float) -> void:
 	_blinks += 1
 
 
-func _on_exhaust(_ratio: float) -> void:
-	_exhaust_count += 1
 
 
 func _on_footstep(radius: float) -> void:
@@ -91,44 +84,18 @@ func _run() -> void:
 	_check(_player.is_on_floor(), "el jugador apoya en el suelo del test")
 	_check(_player.flashlight != null and _player.interactor != null, "linterna e interactor presentes")
 
-	# --- Perfiles de dificultad ------------------------------------------------
-	Game.select_difficulty(Difficulty.Id.EASY)
-	await _frames(3)
-	_check(_player.infinite_stamina and _player.sprint_drain == 0.0, "Fácil: resistencia infinita sin consumo")
-	_exhaust_count = 0
-	await _hold_sprint(120)
-	_check(_player.is_sprinting, "Fácil: el sprint arranca y se mantiene")
-	_check(is_equal_approx(_player.stamina, _player.max_stamina), "Fácil: esprintar no gasta")
-	_check(not _player.is_hyperventilating and _exhaust_count == 0, "Fácil: sin jadeo ni señales de agotamiento")
-	var breath: AudioStreamPlayer = _player.get_node("BreathPlayer") as AudioStreamPlayer
-	_check(breath.volume_db <= -59.0, "Fácil: sin respiración audible")
+	# --- Ajuste estándar y sprint sin resistencia --------------------------------
+	_check(_player.walk_noise_radius == 5.0 and _player.sprint_noise_radius == 14.0, "ruido 5/14 m")
+	_check(_player.water_walk_noise_radius == 8.0 and _player.water_sprint_noise_radius == 22.0, "agua 8/22 m")
+	_check(_player.crouch_noise_radius == 2.0, "conducto 2 m")
+	await _hold_sprint(290)
+	_check(_player.is_sprinting, "casi 5 s corriendo (antes se agotaba): el sprint no se acaba")
 	await _release_all()
-
-	Game.select_difficulty(Difficulty.Id.NORMAL)
 	await _frames(3)
-	_check(_player.sprint_drain == 20.0 and _player.regen_idle == 12.0 and _player.regen_walking == 6.0, "Intermedio: consumo 20 y regen 12/6")
-	_check(_player.walk_noise_radius == 5.0 and _player.sprint_noise_radius == 14.0, "Intermedio: ruido 5/14 m")
-	_check(_player.water_walk_noise_radius == 8.0 and _player.water_sprint_noise_radius == 22.0, "Intermedio: agua 8/22 m")
-	_check(_player.crouch_noise_radius == 2.0 and _player.hyperventilation_noise_factor == 1.5, "Intermedio: conducto 2 m e hiperventilación x1,5")
-	var before: float = _player.stamina
-	await _hold_sprint(180)
-	_check(_player.stamina < before - 10.0, "Intermedio: esprintar consume (%d u)" % int(_player.stamina))
-	_check(_player.is_sprinting, "Intermedio: sigue corriendo con reserva")
+	_check(not _player.is_sprinting, "soltar deja de correr")
+	await _hold_sprint(20)
+	_check(_player.is_sprinting, "se vuelve a correr al instante, sin espera")
 	await _release_all()
-	before = _player.stamina
-	await _frames(120)
-	_check(_player.stamina > before, "Intermedio: la resistencia regenera en reposo")
-	_player.restore_stamina()
-	_check(is_equal_approx(_player.stamina, _player.max_stamina), "restore_stamina llena del todo")
-
-	Game.select_difficulty(Difficulty.Id.HARD)
-	await _frames(3)
-	_check(_player.sprint_drain == 24.0 and _player.regen_idle == 8.0 and _player.regen_walking == 4.0, "Difícil: consumo 24 y regen 8/4")
-	_check(_player.walk_noise_radius == 7.0 and _player.sprint_noise_radius == 18.0, "Difícil: ruido 7/18 m")
-	_check(_player.water_walk_noise_radius == 10.0 and _player.water_sprint_noise_radius == 28.0, "Difícil: agua 10/28 m")
-	_check(_player.crouch_noise_radius == 3.0 and _player.hyperventilation_noise_factor == 1.8, "Difícil: conducto 3 m e hiperventilación x1,8")
-	Game.select_difficulty(Difficulty.Id.NORMAL)
-	await _frames(3)
 
 	# --- Agachado automático ---------------------------------------------------
 	_player.set_crouched(true)
@@ -184,17 +151,7 @@ func _run() -> void:
 	await get_tree().create_timer(0.7).timeout
 	_check(light.band == Flashlight.ThreatBand.STABLE and light.ratio > 0.99, "sin llamadas 0,5 s: vuelve a estable")
 
-	# --- Suelo de Fácil y ritmo del parpadeo ------------------------------------
-	Game.select_difficulty(Difficulty.Id.EASY)
-	await _frames(3)
-	var low: float = 1.0
-	for i: int in 72:
-		light.set_threat(0.5, false)
-		await get_tree().physics_frame
-		low = minf(low, light.ratio)
-	_check(low >= 0.39, "Fácil: nunca bajo el 40 % (mín " + str(snappedf(low, 0.01)) + ")")
-	Game.select_difficulty(Difficulty.Id.NORMAL)
-	await _frames(3)
+	# --- Ritmo del parpadeo -----------------------------------------------------
 	_blinks = 0
 	for i: int in 150:
 		light.set_threat(4.0, false)

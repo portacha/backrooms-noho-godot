@@ -1,5 +1,5 @@
 extends Node
-## Prueba de la interfaz: menú, dificultad, opciones, pausa, muerte, resolución,
+## Prueba de la interfaz: menú, opciones, pausa, muerte, resolución,
 ## leyendas de sonido y documentos. Uso:
 ##   tools/run_godot.sh --headless --path . res://tools/debug/ui_test.tscn
 ## Con ventana (sin --headless) guarda capturas en builds/ui_*.png.
@@ -68,7 +68,7 @@ func _run() -> void:
 	_test_documents()
 
 
-## Menú: CONTINUAR según guardado y el selector de dificultad.
+## Menú: CONTINUAR según guardado; sin selector de dificultad (ajuste único).
 func _test_menu() -> void:
 	var menu: MainMenu = (load(Game.MENU_SCENE) as PackedScene).instantiate() as MainMenu
 	add_child(menu)
@@ -83,13 +83,7 @@ func _test_menu() -> void:
 	_check((menu.get_node("LeftColumn/PlayButton") as Button).text == "JUGAR", "JUGAR sigue siendo el botón primario")
 	await _snap("menu")
 
-	var selector: DifficultySelector = menu.get_node("LeftColumn/DifficultySelector")
-	selector.press_segment(0)
-	_check(Game.selected_difficulty() == Difficulty.Id.EASY, "el selector cambia a Casual")
-	selector.press_segment(1)
-	_check(Game.selected_difficulty() == Difficulty.Id.NORMAL, "el selector cambia a Equilibrio")
-	selector.press_segment(2)
-	_check(Game.selected_difficulty() == Difficulty.Id.HARD, "el selector cambia a Pesadilla")
+	_check(not menu.has_node("LeftColumn/DifficultySelector"), "el menú no ofrece dificultad")
 	menu.queue_free()
 	await _wait(0.1)
 
@@ -162,11 +156,7 @@ func _test_pause() -> void:
 	var ducked: float = AudioServer.get_bus_volume_db(0)
 	_check(absf(ducked - linear_to_db(0.08)) < 0.6, "el audio baja al 10 %% (%.1f dB)" % ducked)
 
-	# El selector de la pausa también cambia el perfil.
-	var selector: DifficultySelector = pause.get_node("Center/Card/Margin/Column/DifficultySelector")
-	selector.press_segment(1)
-	_check(Game.selected_difficulty() == Difficulty.Id.NORMAL, "el selector de la pausa cambia el perfil")
-	_check((pause.get_node("Center/Card/Margin/Column/DifficultyNote") as Label).text.contains("siguiente tramo"), "la pausa avisa del efecto diferido")
+	_check(not pause.has_node("Center/Card/Margin/Column/DifficultySelector"), "la pausa no ofrece dificultad")
 	await _snap("pause")
 
 	pause.resume_game()

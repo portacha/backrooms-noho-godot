@@ -5,6 +5,9 @@
 > **Normativo con**: `docs/03` (mecánicas), `docs/04` (estructura de niveles), `docs/05` (FSM de El Olvidado), `docs/07` (presupuesto de render).
 > **Números de este documento** son *valores iniciales de ajuste* por perfil de dificultad. Se validan en playtest (`docs/08`); la sensación manda sobre la cifra.
 
+>
+> **Enmienda 2026-10-09 (prevalece):** se retiran la **resistencia** y los **niveles de dificultad**. El jugador corre siempre que quiera, sin consumo, jadeo ni señales de cansancio; el precio de correr es solo el **ruido**. Hay una única dificultad, el **ajuste estándar** (los valores "Intermedio" de `docs/12`, en `scripts/core/difficulty.gd`). Añadir perfiles se decidirá cuando el estándar esté afinado. En consecuencia: §3.1 (resistencia) y §4.1–§4.4 (perfiles y su matriz) **no aplican**; donde este documento cite "Intermedio", léase "ajuste estándar"; la compasión y las políticas de reintento de §4.5 valen con sus valores de Intermedio; la carrera final (§8.4) no ajusta ningún consumo.
+
 ---
 
 ## 1. Alcance
@@ -25,7 +28,7 @@ Regla de oro del ritmo: **tensión y respiro se alternan; nunca dos eventos de l
 
 El jugador no tiene vida, inventario ni balas. Sus tres recursos son **resistencia, luz y silencio**. Los valores de esta sección son del perfil **Intermedio** (referencia); los perfiles extremos están en **§4**.
 
-### 3.1 Resistencia (invisible)
+### 3.1 Resistencia (invisible) — retirada (ver enmienda)
 
 | Parámetro | Valor (Intermedio) | Notas |
 |---|---|---|
@@ -66,7 +69,7 @@ El jugador no tiene vida, inventario ni balas. Sus tres recursos son **resistenc
 
 Cada evento de ruido puntual (tropiezo, objeto caído) añade **+15 estímulo** en un radio de 20 m.
 
-## 4. Niveles de dificultad
+## 4. Niveles de dificultad — retirados (ver enmienda); queda el ajuste estándar
 
 Tres perfiles, elegibles por el jugador. **Por defecto: Intermedio.**
 

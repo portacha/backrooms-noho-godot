@@ -26,6 +26,10 @@ Menú principal → **Prólogo** → caída por el cuadro → **Nivel 1** → le
 - Globales de shader: `world_light` (atenúa todo el mundo; lo usa la recogida de la letra), `flicker_seed` y `flicker_override` (−1 = cada tubo parpadea solo, como en el Nivel 1; ≥ 0 = el guion del nivel dicta el brillo de los tubos `flicker`, como en los pasillos del prólogo). `LevelDef.flicker_color` da el color de esos tubos.
 - **Mobiliario y utilería son modelos** (regla dura 10): `tools/blender/build_models.py` genera 44 modelos low-poly en `assets/models/*.glb` (materiales de color plano, sin texturas). La definición del nivel los coloca en `props` y el constructor los **funde en la malla horneada**: cada material de Blender pasa a ser un tinte de un único material de paleta, así reciben la luz horneada y no se pasa de 6 materiales por nivel. Las superficies `Screen` y `Flame` van a los materiales emisivos del nivel.
 - Los objetos dinámicos (linterna, letra N) usan los mismos `.glb` instanciados en ejecución con `LevelBase.spawn_model()`.
+- **Suelo hundido** (`floor_y` en un tile, ≤ 0): el constructor baja el suelo y su losa de colisión, alarga los muros hasta el fondo, emite la contrahuella vista hacia el vecino más alto y una **rampa de colisión oculta** (`RAMP_LENGTH` = 0,7 m) para subirla andando. Lo usa el cauce del Nivel 3.
+- **Agua del Nivel 3** (`shaders/water_surface.gdshader` + `scripts/fx/water_maps.gd`): la lámina va 6 cm **por debajo** del suelo seco, sobre un cauce de 24 cm (`BED`/`SURFACE` en `level3_def.gd`; los props de celdas inundadas bajan al fondo y lo que flota —flores, veladoras, cartera— queda en la lámina). Se lee como agua por: espejo de las calaveras (el rayo reflejado se sigue hasta el techo y muestrea una planta generada al cargar con la cara de cada calavera), Fresnel (fondo de limo a los pies, espejo a lo lejos), oleaje enlosable generado al cargar, línea de orilla contra los muros y anillos alrededor del jugador (`wake`). Sin luces nuevas ni texturas en disco. En backrooms se ve alfombra, pero **el chapoteo se conserva a propósito**; a la tercera pisada el oficinista piensa «¿Por qué sigo sintiendo el agua en mis pies?» (una vez por carga, `hud.show_line`).
+- **Nivel 4, fotografía según `concept/art/04-nivel4-O-*`**: niebla de profundidad color vino (densidad 0,03) que deja ver la isla siguiente y diez **islotes escénicos** (`_islet()` en `level4_def.gd`: roca, marco de puerta con su luz, un mueble); puentes de **papel picado calado** (`papel_picado_tiles.png`, un panel por celda) con luz magenta horneada; puerta de roble texturizada (`hero/`) entre veladoras, con resplandor rojo aditivo y un dosel de guirnaldas sobre el último puente, siempre por encima del neón. El **sendero de pétalos** es una cinta continua por cadena de puentes (marcadores `trail_<n>_<i>`, esquinas redondeadas, serpenteo) con `shaders/petal_path.gdshader`: lo revela el círculo del haz por píxel y una textura de memoria (una muestra cada 0,5 m) lo apaga despacio. Los **pétalos del vacío** son un `MultiMesh` de hojas con forma que giran y derivan en `shaders/petal_drift.gdshader` (sin coste de CPU por fotograma).
+- **Bruma de la dimensión oscura** (`LevelBase.add_mist()` + `shaders/mist.gdshader`, niveles 2–4): un `MultiMesh` de 16–26 láminas que miran a cámara, acompañan al jugador y se recolocan fuera de su alcance; la linterna las ilumina (el haz se ve en el aire). En doble realidad siguen al global `reality` (nada de bruma en lo amarillo); el Nivel 4 la lleva siempre. La niebla del `Environment` sigue dando la distancia (`fog_real_*`).
 
 **Reconstruir** (obligatorio tras tocar un `_def.gd` o un modelo; el resultado `scenes/levels/generated/*.scn` se versiona):
 
@@ -50,7 +54,7 @@ godot --headless --path . --script res://tools/build_levels.gd -- level1  # uno
 | Ruta | Contenido |
 |---|---|
 | `scripts/core/game.gd` | Autoload `Game`: cambio de escena, color del fundido de entrada, ajustes de sesión |
-| `scripts/player/` | `player.gd` (movimiento, resistencia, cámara), `interactor.gd` (foco + toque/mantener), `flashlight.gd` |
+| `scripts/player/` | `player.gd` (movimiento, sprint sin resistencia, cámara), `interactor.gd` (foco + toque/mantener), `flashlight.gd` |
 | `scripts/interaction/` | `Interactable`, `DocumentPickup`, `DocumentData` (los textos están en `resources/documents/*.tres`) |
 | `scripts/ui/` | `hud.gd` (retícula, lectura, pistas, tarjeta final), `main_menu.gd`, `pause_menu.gd`, `touch_controls.gd` |
 | `scripts/fx/screen_fx.gd` + `shaders/screen_fx.gdshader` | Aberración, distorsión, viñeta y fundidos; visible solo durante eventos |
@@ -91,6 +95,7 @@ SHOT_SCENE=res://scenes/levels/prologue.tscn SHOT_VIEWS="a:21,23,0,0" \
 
 | `docs/14` §6.2: mantener 1,5 s sobre el cuadro | Mirada sostenida, sin tocar; apartar la vista corta la transición | Decisión del usuario (2026-10-09). Enmienda en `docs/14` |
 | `docs/14` §1 y §8: nada se mueve; sin aire | Los tubos de los pasillos fallan una vez en el cruce (con frase del oficinista) y hay ventilador leve junto a los terminales | Ídem |
+| `docs/04`: el agua del Nivel 3 cubierta casi por completo de cempasúchil | Balsas de flores (≈ 36 %) con agua negra entre ellas | Con la alfombra densa no se leía como agua (pedido del usuario, 2026-10-09) |
 | `docs/07`: máx. 6 materiales por nivel | El prólogo suma un material para los lienzos de pasillo (una sola malla) | Ya se superaba con cuadro, pantallas y paneles; pendiente de unificar en atlas |
 
 ## 6. Pendiente inmediato
@@ -98,5 +103,5 @@ SHOT_SCENE=res://scenes/levels/prologue.tscn SHOT_VIEWS="a:21,23,0,0" \
 1. Jugar a mano en escritorio y en un móvil real (los controles táctiles solo están probados con eventos simulados).
 2. Exportación Web y Android: no hay plantillas de exportación instaladas en esta máquina.
 3. Escuchar y mezclar el audio generado (niveles fijados a ojo, por medición de pico).
-4. Opciones (movimiento reducido, sensibilidad, leyendas de sonido), perfiles de dificultad, guardado.
+4. Opciones (movimiento reducido, sensibilidad, leyendas de sonido), guardado. (Sin perfiles de dificultad ni resistencia: `Difficulty` es el ajuste estándar único.)
 5. Nivel 2 y El Olvidado (`docs/05`).

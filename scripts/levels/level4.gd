@@ -12,7 +12,10 @@ var crossing: bool = false
 var current_bridge: int = 0
 var presence_seen: bool = false
 var _falling: bool = false
-var _paths: Array[MeshInstance3D] = []
+## Sendero de pétalos: una cinta por cadena de puentes. `_trail_points` son sus muestras (una
+## cada TRAIL_STEP) y `_reveals` cuánto recuerda cada una haber sido alumbrada.
+var _trails: Array[Dictionary] = []
+var _trail_points: PackedVector3Array = PackedVector3Array()
 var _reveal_sound: AudioStream
 var _reveal_cooldown: float = 0.0
 var _door_closed: Node3D
@@ -23,11 +26,13 @@ var _candles: Array[Node3D] = []
 var _emergency_time: float = 0.0
 var _path_shader: Shader
 var _reveals: PackedFloat32Array = PackedFloat32Array()
-var _motes: CPUParticles3D
 
 const MAGENTA: Color = Color(1.0, 0.16, 0.62)
 const CANDLE: Color = Color(1.0, 0.55, 0.16)
 const ALARM: Color = Color(1.0, 0.03, 0.04)
+const FOG_COLOR: Color = Color(0.07, 0.026, 0.06)
+const TRAIL_STEP: float = 0.5
+const TRAIL_CORNER: float = 0.7
 
 func _ready() -> void:
 	super()
@@ -40,6 +45,18 @@ func _ready() -> void:
 	_path_shader = load("res://shaders/petal_path.gdshader") as Shader
 	player.flashlight.available = true
 	player.sprint_enabled = true
+	# Todo el nivel es la dimensión oscura: la bruma no depende de `reality`.
+	# Niebla de profundidad, color vino (concept/art/04): la isla siguiente y los islotes con su
+	# luz se adivinan a 30–50 m y se pierden más allá; el neón no la sufre y sigue guiando.
+	var environment: Environment = ($WorldEnvironment as WorldEnvironment).environment
+	environment.fog_light_color = FOG_COLOR
+	environment.fog_density = 0.03
+	# El cielo se hunde en la misma niebla: las islas lejanas no se recortan más claras que el fondo.
+	environment.fog_sky_affect = 0.85
+	var sky: ProceduralSkyMaterial = environment.sky.sky_material as ProceduralSkyMaterial
+	sky.sky_horizon_color = Color(0.1, 0.022, 0.06)
+	sky.ground_horizon_color = Color(0.1, 0.022, 0.06)
+	add_mist(Color(0.13, 0.06, 0.13), 0.4, 28, 18.0, false, false, Vector2(11.0, 3.6))
 	var checkpoint: String = spawn_at_checkpoint("start", PI)
 	current_bridge = {"r1": 2, "altar": 3}.get(checkpoint, 0)
 	presence_seen = checkpoint == "altar"
@@ -66,7 +83,7 @@ func _ready() -> void:
 	var buzz: AudioStream = load_audio("res://assets/audio/ambient/neon_buzz_loop.ogg")
 	if buzz != null:
 		play_sound_at(buzz, marker("neon"), -14.0, 18.0)
-	_door_closed = _model("oak_door_monumental", marker("door"), 0.15)
+	_door_closed = _hero_model("oak_door_monumental", marker("door"))
 	_door_open = _model("oak_door_open", marker("door"), 0.15)
 	if _door_open != null:
 		_door_open.visible = false
@@ -88,7 +105,6 @@ func _process(delta: float) -> void:
 	if not chase_started:
 		entity.pressure_frozen = true
 	update_letter_fx(altar)
-	_motes.global_position = player.global_position
 	_reveal_cooldown = maxf(0.0, _reveal_cooldown - delta)
 	_update_paths(delta)
 	if not _falling and player.global_position.y < -6.0:
@@ -107,38 +123,125 @@ func _process(delta: float) -> void:
 
 func _build_paths() -> void:
 	var texture: Texture2D = load("res://assets/textures/petals_path.png") as Texture2D
-	for point: Node in geo.get_node("Markers").get_children():
-		if not String(point.name).begins_with("path_"):
-			continue
-		var quad: QuadMesh = QuadMesh.new()
-		quad.size = Vector2(0.85, 1.95)
-		var material: ShaderMaterial = ShaderMaterial.new()
-		material.shader = _path_shader
-		material.set_shader_parameter("petals", texture)
-		var path: MeshInstance3D = MeshInstance3D.new()
-		path.mesh = quad
-		path.material_override = material
-		path.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		add_child(path)
-		path.global_position = (point as Node3D).global_position + Vector3.UP * 0.03
-		path.rotation.x = -PI * 0.5
-		_paths.append(path)
-	_reveals.resize(_paths.size())
+	var trail: int = 0
+	while has_marker("trail_%d_0" % trail):
+		var corners: PackedVector3Array = PackedVector3Array()
+		while has_marker("trail_%d_%d" % [trail, corners.size()]):
+			corners.append(marker("trail_%d_%d" % [trail, corners.size()]))
+		_add_trail(_resample(_round_corners(corners)), texture, trail)
+		trail += 1
+	_reveals.resize(_trail_points.size())
+
+
+## Las esquinas del puente se vuelven curvas: el sendero dobla, no se quiebra.
+func _round_corners(corners: PackedVector3Array) -> PackedVector3Array:
+	var line: PackedVector3Array = PackedVector3Array([corners[0]])
+	for index: int in range(1, corners.size() - 1):
+		var corner: Vector3 = corners[index]
+		var from: Vector3 = corner + (corners[index - 1] - corner).limit_length(TRAIL_CORNER)
+		var to: Vector3 = corner + (corners[index + 1] - corner).limit_length(TRAIL_CORNER)
+		for step: int in 7:
+			var t: float = step / 6.0
+			line.append(from.lerp(corner, t).lerp(corner.lerp(to, t), t))
+	line.append(corners[corners.size() - 1])
+	return line
+
+
+## Muestras equidistantes (TRAIL_STEP) a lo largo de una polilínea.
+func _resample(line: PackedVector3Array) -> PackedVector3Array:
+	var samples: PackedVector3Array = PackedVector3Array([line[0]])
+	var pending: float = TRAIL_STEP
+	for index: int in range(1, line.size()):
+		var from: Vector3 = line[index - 1]
+		var length: float = from.distance_to(line[index])
+		var walked: float = 0.0
+		while length - walked >= pending:
+			walked += pending
+			pending = TRAIL_STEP
+			samples.append(from.lerp(line[index], walked / length))
+		pending -= length - walked
+	return samples
+
+
+## Cinta de pétalos sobre una polilínea: serpentea y cambia de ancho como algo que se derramó a
+## mano, sin salirse del puente (2 m de ancho).
+func _add_trail(line: PackedVector3Array, texture: Texture2D, seed: int) -> void:
+	var count: int = line.size()
+	var vertices: PackedVector3Array = PackedVector3Array()
+	var normals: PackedVector3Array = PackedVector3Array()
+	var uvs: PackedVector2Array = PackedVector2Array()
+	var uv2s: PackedVector2Array = PackedVector2Array()
+	var indices: PackedInt32Array = PackedInt32Array()
+	for index: int in count:
+		var tangent: Vector3 = (line[mini(index + 1, count - 1)] - line[maxi(index - 1, 0)]).normalized()
+		var side: Vector3 = tangent.cross(Vector3.UP)
+		var along: float = index * TRAIL_STEP
+		var centre: Vector3 = line[index] + side * (0.2 * sin(along * 0.5 + seed * 1.9) + 0.08 * sin(along * 1.63 + seed)) + Vector3.UP * 0.03
+		var half: float = 0.52 + 0.14 * sin(along * 0.83 + seed * 2.7)
+		_trail_points.append(centre)
+		for edge: int in 2:
+			vertices.append(centre + side * half * (edge * 2.0 - 1.0))
+			normals.append(Vector3.UP)
+			uvs.append(Vector2(edge, along / 1.95))
+			uv2s.append(Vector2((index + 0.5) / count, 0.0))
+		if index > 0:
+			var base: int = index * 2
+			indices.append_array(PackedInt32Array([base - 2, base, base - 1, base - 1, base, base + 1]))
+	var arrays: Array = []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_TEX_UV] = uvs
+	arrays[Mesh.ARRAY_TEX_UV2] = uv2s
+	arrays[Mesh.ARRAY_INDEX] = indices
+	var mesh: ArrayMesh = ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	var image: Image = Image.create(count, 1, false, Image.FORMAT_R8)
+	var memory: ImageTexture = ImageTexture.create_from_image(image)
+	var material: ShaderMaterial = ShaderMaterial.new()
+	material.shader = _path_shader
+	material.set_shader_parameter("petals", texture)
+	material.set_shader_parameter("reveal_tex", memory)
+	var ribbon: MeshInstance3D = MeshInstance3D.new()
+	ribbon.name = "Sendero%d" % seed
+	ribbon.mesh = mesh
+	ribbon.material_override = material
+	ribbon.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(ribbon)
+	_trails.append({"first": _trail_points.size() - count, "count": count, "image": image, "memory": memory, "material": material})
 
 
 func _update_paths(delta: float) -> void:
-	for index: int in _paths.size():
-		var path: MeshInstance3D = _paths[index]
-		var old: float = _reveals[index]
-		var lit: bool = player.flashlight.is_lighting(path.global_position)
-		_reveals[index] = move_toward(old, 1.0 if lit else 0.0, delta * (3.0 if lit else 0.12))
-		if _reveals[index] != old:
-			(path.material_override as ShaderMaterial).set_shader_parameter("reveal", _reveals[index])
-		if lit and old < 0.1 and _reveal_cooldown <= 0.0:
-			_reveal_cooldown = 2.5
-			if _reveal_sound != null:
-				play_sound_at(_reveal_sound, path.global_position, -17.0, 10.0)
-			Game.caption("[los pétalos resplandecen]", 2.0)
+	var beam: Flashlight = player.flashlight
+	var beam_on: bool = beam.is_lighting(beam.global_position)
+	for trail: Dictionary in _trails:
+		var material: ShaderMaterial = trail["material"]
+		material.set_shader_parameter("beam_on", 1.0 if beam_on else 0.0)
+		if beam_on:
+			material.set_shader_parameter("beam_origin", beam.global_position)
+			material.set_shader_parameter("beam_direction", -beam.global_transform.basis.z)
+			material.set_shader_parameter("beam_cos", cos(deg_to_rad(beam.cone_half_angle_degrees)))
+			material.set_shader_parameter("beam_range", beam.lighting_range)
+		var image: Image = trail["image"]
+		var first: int = trail["first"]
+		var changed: bool = false
+		for offset: int in int(trail["count"]):
+			var index: int = first + offset
+			var old: float = _reveals[index]
+			if not beam_on and old <= 0.0:
+				continue
+			var lit: bool = beam_on and beam.is_lighting(_trail_points[index])
+			_reveals[index] = move_toward(old, 1.0 if lit else 0.0, delta * (3.0 if lit else 0.12))
+			if _reveals[index] != old:
+				changed = true
+				image.set_pixel(offset, 0, Color(_reveals[index], 0.0, 0.0))
+			if lit and old < 0.1 and _reveal_cooldown <= 0.0:
+				_reveal_cooldown = 2.5
+				if _reveal_sound != null:
+					play_sound_at(_reveal_sound, _trail_points[index], -17.0, 10.0)
+				Game.caption("[los pétalos resplandecen]", 2.0)
+		if changed:
+			(trail["memory"] as ImageTexture).update(image)
 
 
 ## El neón de la puerta: lo único que atraviesa toda la niebla (docs/13 §11). Ni él ni su halo
@@ -156,6 +259,13 @@ func _build_neon() -> void:
 		diagonal.position.x += 2.0 * centre
 		for surface: int in diagonal.mesh.get_surface_count():
 			(diagonal.get_surface_override_material(surface) as StandardMaterial3D).cull_mode = BaseMaterial3D.CULL_DISABLED
+	_add_halo(marker("neon") + Vector3(0.0, -0.3, -0.4), Vector2(11.0, 7.0), Color(MAGENTA.r, MAGENTA.g, MAGENTA.b, 0.42))
+	# El resplandor rojo que envuelve la puerta en el concept: se ve desde el altar, a 75 m.
+	_add_halo(marker("neon") + Vector3(0.0, 0.5, 3.0), Vector2(64.0, 40.0), Color(1.0, 0.06, 0.1, 0.2))
+
+
+## Resplandor: disco aditivo que mira a cámara y no recibe niebla.
+func _add_halo(at: Vector3, size: Vector2, color: Color) -> void:
 	var falloff: Gradient = Gradient.new()
 	falloff.set_color(0, Color.WHITE)
 	falloff.set_color(1, Color(1.0, 1.0, 1.0, 0.0))
@@ -168,47 +278,67 @@ func _build_neon() -> void:
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	material.albedo_color = Color(MAGENTA.r, MAGENTA.g, MAGENTA.b, 0.42)
+	material.albedo_color = color
 	material.albedo_texture = texture
 	material.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 	material.disable_fog = true
 	var quad: QuadMesh = QuadMesh.new()
-	quad.size = Vector2(11.0, 7.0)
+	quad.size = size
 	var halo: MeshInstance3D = MeshInstance3D.new()
 	halo.mesh = quad
 	halo.material_override = material
+	halo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(halo)
-	halo.global_position = marker("neon") + Vector3(0.0, -0.3, -0.4)
+	halo.global_position = at
 
 
-## Pétalos que suben despacio desde el abismo, alrededor del jugador: dan escala al vacío.
+## Pétalos de cempasúchil que suben despacio desde el abismo: dan escala al vacío. Cada uno es
+## una hoja con forma y pliegue que gira sobre sí misma (`shaders/petal_drift.gdshader`).
 func _build_motes() -> void:
-	var quad: QuadMesh = QuadMesh.new()
-	quad.size = Vector2(0.12, 0.09)
-	var material: StandardMaterial3D = StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.albedo_color = Color(1.0, 0.5, 0.12)
-	material.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
-	material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	quad.material = material
-	_motes = CPUParticles3D.new()
-	_motes.mesh = quad
-	_motes.amount = 260
-	_motes.lifetime = 14.0
-	_motes.preprocess = 14.0
-	_motes.local_coords = false
-	_motes.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
-	_motes.emission_box_extents = Vector3(26.0, 9.0, 26.0)
-	_motes.direction = Vector3.UP
-	_motes.spread = 25.0
-	_motes.gravity = Vector3.ZERO
-	_motes.initial_velocity_min = 0.15
-	_motes.initial_velocity_max = 0.5
-	_motes.angular_velocity_min = -60.0
-	_motes.angular_velocity_max = 60.0
-	_motes.scale_amount_min = 0.6
-	_motes.scale_amount_max = 1.8
-	add_child(_motes)
+	var extent: Vector3 = Vector3(24.0, 10.0, 24.0)
+	# Pétalo: base estrecha, vientre ancho y punta mellada, doblado por su nervio.
+	var outline: PackedVector3Array = PackedVector3Array([
+		Vector3(0.0, 0.0, 0.0), Vector3(-0.03, 0.045, 0.012), Vector3(-0.022, 0.1, 0.006), Vector3(0.0, 0.088, -0.004),
+		Vector3(0.022, 0.1, 0.006), Vector3(0.03, 0.045, 0.012), Vector3(0.0, 0.05, -0.012)])
+	var vertices: PackedVector3Array = PackedVector3Array()
+	var normals: PackedVector3Array = PackedVector3Array()
+	var uvs: PackedVector2Array = PackedVector2Array()
+	for index: int in 6:
+		var corners: Array[Vector3] = [outline[6], outline[index], outline[(index + 1) % 6]]
+		var normal: Vector3 = (corners[1] - corners[0]).cross(corners[2] - corners[0]).normalized()
+		for corner: Vector3 in corners:
+			vertices.append(corner - Vector3(0.0, 0.05, 0.0))
+			normals.append(normal)
+			uvs.append(Vector2(0.5, corner.y / 0.1))
+	var arrays: Array = []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_TEX_UV] = uvs
+	var petal: ArrayMesh = ArrayMesh.new()
+	petal.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	var material: ShaderMaterial = ShaderMaterial.new()
+	material.shader = load("res://shaders/petal_drift.gdshader") as Shader
+	material.set_shader_parameter("extent", extent)
+	var cloud: MultiMesh = MultiMesh.new()
+	cloud.transform_format = MultiMesh.TRANSFORM_3D
+	cloud.use_custom_data = true
+	cloud.mesh = petal
+	cloud.instance_count = 340
+	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	rng.seed = 4104
+	for index: int in cloud.instance_count:
+		var home: Vector3 = Vector3(rng.randf_range(-1.0, 1.0), rng.randf_range(-1.0, 1.0), rng.randf_range(-1.0, 1.0)) * extent
+		cloud.set_instance_transform(index, Transform3D(Basis.IDENTITY, home))
+		cloud.set_instance_custom_data(index, Color(rng.randf(), rng.randf(), rng.randf(), rng.randf()))
+	var motes: MultiMeshInstance3D = MultiMeshInstance3D.new()
+	motes.name = "Petalos"
+	motes.multimesh = cloud
+	motes.material_override = material
+	motes.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# La nube sigue a la cámara en el shader: nunca debe descartarse por su caja.
+	motes.custom_aabb = AABB(Vector3.ONE * -4096.0, Vector3.ONE * 8192.0)
+	add_child(motes)
 
 
 ## Cambia el brillo de las superficies especiales (`Glow`, `Flame`) de un modelo dinámico.
@@ -262,7 +392,8 @@ func _take_letter() -> void:
 func _break_world() -> void:
 	entity.vanish()
 	var environment: Environment = ($WorldEnvironment as WorldEnvironment).environment
-	environment.fog_light_color = Color(0.11, 0.008, 0.016)
+	environment.fog_light_color = Color(0.13, 0.008, 0.016)
+	set_mist_tint(Color(0.3, 0.03, 0.05))
 	var sky: ProceduralSkyMaterial = environment.sky.sky_material as ProceduralSkyMaterial
 	sky.sky_horizon_color = Color(0.3, 0.012, 0.03)
 	sky.ground_horizon_color = Color(0.3, 0.012, 0.03)
@@ -320,6 +451,19 @@ func _model(model: String, at: Vector3, glow: float, special_glow: float = 2.5, 
 	result.global_position = at
 	result.rotation.y = yaw
 	return result
+
+
+## Modelo texturizado (`assets/models/hero/`) con la luz horneada del nivel; si no existe, el plano.
+func _hero_model(model: String, at: Vector3) -> Node3D:
+	var path: String = "res://assets/models/hero/%s.glb" % model
+	if not ResourceLoader.exists(path):
+		return _model(model, at, 0.15)
+	var instance: Node3D = (load(path) as PackedScene).instantiate() as Node3D
+	add_child(instance)
+	instance.global_position = at
+	instance.rotation.y = PI
+	light_hero(instance, geo.get_meta("lights", []), geo.get_meta("flicker_color", Color(1.0, 0.93, 0.7)), false)
+	return instance
 
 
 func _sound(file: String, volume: float) -> void:

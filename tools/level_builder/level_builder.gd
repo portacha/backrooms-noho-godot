@@ -3,6 +3,8 @@ extends RefCounted
 
 const STEP: float = 0.5
 const DOOR_HEIGHT: float = 2.1
+## Largo de la rampa de colisión que salva un suelo hundido (`floor_y`).
+const RAMP_LENGTH: float = 0.7
 const DIRS: Array[Vector2i] = [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1)]
 
 class SurfaceData:
@@ -241,8 +243,9 @@ func _emit_cell(c: int, r: int) -> void:
 	var cell: int = r * _width + c
 	var height: float = _cell_height(tile)
 	var top: float = _clearance(tile)
+	var sunk: float = _floor_y(tile)
 	if tile.has("floor"):
-		_face(tile["floor"], Vector3(x, 0, z), Vector3(cs, 0, 0), Vector3(0, 0, cs), Vector3.UP, cell, 0)
+		_face(tile["floor"], Vector3(x, sunk, z), Vector3(cs, 0, 0), Vector3(0, 0, cs), Vector3.UP, cell, 0)
 	if tile.has("ceiling") and not bool(tile.get("door", false)):
 		_face(tile["ceiling"], Vector3(x, height, z), Vector3(cs, 0, 0), Vector3(0, 0, cs), Vector3.DOWN, cell, 1)
 	if bool(tile.get("door", false)):
@@ -253,8 +256,11 @@ func _emit_cell(c: int, r: int) -> void:
 		_face(tile.get("edge", tile["floor"]), Vector3(x, -_def.void_skirt_depth, z), Vector3(cs, 0, 0), Vector3(0, 0, cs), Vector3.DOWN, cell, 3)
 	for dir: Vector2i in DIRS:
 		var neighbour: Dictionary = _tile(c + dir.x, r + dir.y)
-		var bottom: float = 0.0
+		var bottom: float = sunk
 		var mat: StringName
+		# Suelo hundido: contrahuella vista hacia el vecino más alto y rampa oculta para subirla.
+		if _open(neighbour) and neighbour.has("floor") and _floor_y(neighbour) > sunk + 0.001:
+			_emit_riser(tile, neighbour, Vector3(x, sunk, z), dir, cell)
 		if _def.open_void and tile.has("floor") and (not _open(neighbour) or not neighbour.has("floor")) and not bool(neighbour.get("solid", false)):
 			var skirt: Vector3 = Vector3(x, -_def.void_skirt_depth, z)
 			var edge_along: Vector3 = Vector3(cs, 0, 0)
@@ -286,7 +292,7 @@ func _emit_cell(c: int, r: int) -> void:
 		if (bottom > 0.0 and not bool(neighbour.get("door", false))) or (_def.open_void and neighbour.is_empty()):
 			var depth: Vector3 = Vector3(0.04 if dir.x != 0 else cs, top - bottom, cs if dir.x != 0 else 0.04)
 			_shape(depth, origin + along * 0.5 + Vector3(0, (top - bottom) * 0.5, 0))
-		if bottom == 0.0 and _def.baseboard_height > 0.0:
+		if is_zero_approx(bottom) and _def.baseboard_height > 0.0:
 			var inward: Vector3 = Vector3(-dir.x, 0, -dir.y)
 			_palette_uv = Vector2((_palette_index(_def.baseboard_tint) + 0.5) / PALETTE_SIZE, 0.5)
 			_face(PALETTE_MATERIAL, origin + inward * 0.012, along, Vector3(0, _def.baseboard_height, 0), inward, cell, 3)
@@ -852,6 +858,37 @@ func _emit_panels() -> void:
 	_attach(_root, panels)
 
 ## Altura geométrica y altura libre: las puertas mantienen su dintel de 2.1 m.
+## Contrahuella entre un suelo hundido y su vecino, con una rampa de colisión de RAMP_LENGTH
+## por el lado bajo: el escalón se ve, pero se sube andando.
+func _emit_riser(tile: Dictionary, neighbour: Dictionary, corner: Vector3, dir: Vector2i, cell: int) -> void:
+	var cs: float = _def.cell_size
+	var rise: float = _floor_y(neighbour) - corner.y
+	var origin: Vector3 = corner
+	var along: Vector3 = Vector3(cs, 0, 0)
+	if dir.x != 0:
+		origin.x += cs if dir.x > 0 else 0.0
+		along = Vector3(0, 0, cs)
+	elif dir.y > 0:
+		origin.z += cs
+	_face(neighbour.get("edge", tile["floor"]), origin, along, Vector3(0, rise, 0), Vector3(-dir.x, 0, -dir.y), cell, 2)
+	var angle: float = atan2(rise, RAMP_LENGTH)
+	var node: CollisionShape3D = CollisionShape3D.new()
+	var shape: BoxShape3D = BoxShape3D.new()
+	var length: float = Vector2(rise, RAMP_LENGTH).length()
+	var middle: Vector3 = origin + along * 0.5 + Vector3(-dir.x * RAMP_LENGTH * 0.5, rise * 0.5, -dir.y * RAMP_LENGTH * 0.5)
+	if dir.x != 0:
+		shape.size = Vector3(length, 0.1, cs)
+		node.rotation.z = angle * dir.x
+	else:
+		shape.size = Vector3(cs, 0.1, length)
+		node.rotation.x = -angle * dir.y
+	node.shape = shape
+	node.position = middle - node.basis.y * 0.05
+	_attach(_collision, node)
+
+func _floor_y(tile: Dictionary) -> float:
+	return float(tile.get("floor_y", 0.0))
+
 func _cell_height(tile: Dictionary) -> float:
 	return float(tile.get("height", _def.wall_height))
 
@@ -881,12 +918,12 @@ func _merge_slabs(kind: String, all_open: bool = false) -> void:
 			if not _open(tile) or (not all_open and not tile.has(kind)):
 				c += 1
 				continue
-			var height: float = 0.0 if kind == "floor" else _clearance(tile)
+			var height: float = _floor_y(tile) if kind == "floor" else _clearance(tile)
 			var first: int = c
 			c += 1
 			while c < _width:
 				var neighbour: Dictionary = _tile(c, r)
-				if not _open(neighbour) or (not all_open and not neighbour.has(kind)) or (kind == "ceiling" and not is_equal_approx(_clearance(neighbour), height)):
+				if not _open(neighbour) or (not all_open and not neighbour.has(kind)) or not is_equal_approx(_floor_y(neighbour) if kind == "floor" else _clearance(neighbour), height):
 					break
 				c += 1
 			# El identificador de altura evita fusionar techos distintos entre filas.
@@ -902,7 +939,7 @@ func _merge_slabs(kind: String, all_open: bool = false) -> void:
 				var rect: Rect2i = active[key]
 				var cs: float = _def.cell_size
 				var thickness: float = _def.void_skirt_depth if kind == "floor" and _def.open_void else 0.2
-				var y: float = -thickness * 0.5 if kind == "floor" else heights[key] + thickness * 0.5
+				var y: float = heights[key] - thickness * 0.5 if kind == "floor" else heights[key] + thickness * 0.5
 				_shape(Vector3(rect.size.x * cs, thickness, rect.size.y * cs), Vector3((rect.position.x + rect.size.x * 0.5) * cs, y, (rect.position.y + rect.size.y * 0.5) * cs))
 		active = next
 

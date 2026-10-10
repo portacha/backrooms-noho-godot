@@ -1,10 +1,9 @@
 extends Node
 ## Autoload `Game`: flujo entre escenas (menú → prólogo → niveles → final), ajustes,
-## perfil de dificultad, checkpoints y muerte/reintento (docs/12 §4 y §10, docs/13 §6–§8).
+## ajuste estándar, checkpoints y muerte/reintento (docs/12 §4 y §10, docs/13 §6–§8).
 
 signal scene_changing(path: String)
 signal settings_changed
-signal difficulty_changed
 ## Leyenda de sonido para quien juega sin auriculares (docs/13 §8). La pinta el HUD.
 signal caption_requested(text: String, duration: float)
 
@@ -31,7 +30,6 @@ const DEFAULT_SETTINGS: Dictionary = {
 	"master_volume": 1.0,
 	"touch_opacity": 0.35,
 	"touch_scale": 1.0,
-	"difficulty": Difficulty.Id.NORMAL,
 }
 
 ## Epitafios de calaverita para la pantalla de muerte (voz grabada, docs/11 §4).
@@ -44,8 +42,8 @@ const EPITAPHS: Array[String] = [
 ]
 
 var settings: Dictionary = DEFAULT_SETTINGS.duplicate()
-## Perfil activo. Cambia solo en un checkpoint (docs/12 §4.3), nunca en mitad de un tramo.
-var difficulty: Difficulty = Difficulty.make(Difficulty.Id.NORMAL)
+## Ajuste estándar: la única dificultad del juego (docs/12 §4).
+var difficulty: Difficulty = Difficulty.new()
 ## Color con el que arranca el fundido de entrada de la siguiente escena (docs/14 §7).
 var fade_in_color: Color = Color.BLACK
 var checkpoint_scene: String = ""
@@ -64,7 +62,6 @@ var reduced_camera_motion: bool:
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_load()
-	difficulty = Difficulty.make(int(settings["difficulty"]) as Difficulty.Id)
 	_apply_volume()
 
 
@@ -84,17 +81,6 @@ func set_setting(key: String, value: Variant) -> void:
 	settings_changed.emit()
 
 
-## Elegir perfil: fuera de partida surte efecto ya; en partida, en el siguiente checkpoint.
-func select_difficulty(id: Difficulty.Id) -> void:
-	set_setting("difficulty", id)
-	if not in_run():
-		_apply_difficulty()
-
-
-func selected_difficulty() -> Difficulty.Id:
-	return int(settings["difficulty"]) as Difficulty.Id
-
-
 func in_run() -> bool:
 	var scene: Node = get_tree().current_scene
 	return scene != null and scene.scene_file_path in LEVEL_ORDER
@@ -106,7 +92,6 @@ func start_new_game() -> void:
 	checkpoint_scene = ""
 	checkpoint_id = ""
 	deaths_in_segment = 0
-	_apply_difficulty()
 	_save()
 	goto_scene(PROLOGUE_SCENE)
 
@@ -119,7 +104,6 @@ func continue_game() -> void:
 	if not has_save():
 		start_new_game()
 		return
-	_apply_difficulty()
 	goto_scene(checkpoint_scene)
 
 
@@ -138,7 +122,6 @@ func next_level(from_color: Color = Color.BLACK) -> void:
 		checkpoint_scene = target
 		checkpoint_id = ""
 		deaths_in_segment = 0
-		_apply_difficulty()
 		_save()
 	goto_scene(target, from_color)
 
@@ -168,7 +151,6 @@ func set_checkpoint(id: String) -> void:
 	checkpoint_scene = scene
 	checkpoint_id = id
 	deaths_in_segment = 0
-	_apply_difficulty()
 	_save()
 
 
@@ -225,14 +207,6 @@ func vibrate(milliseconds: int) -> void:
 
 
 # --- Persistencia --------------------------------------------------------------------------
-
-func _apply_difficulty() -> void:
-	var id: Difficulty.Id = selected_difficulty()
-	if difficulty.id == id:
-		return
-	difficulty = Difficulty.make(id)
-	difficulty_changed.emit()
-
 
 func _apply_volume() -> void:
 	AudioServer.set_bus_volume_db(0, linear_to_db(clampf(float(settings["master_volume"]), 0.0001, 1.0)))

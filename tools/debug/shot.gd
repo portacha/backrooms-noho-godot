@@ -23,6 +23,8 @@ func _ready() -> void:
 		var v: PackedFloat64Array = parts[1].split_floats(",")
 		player.global_position = Vector3(v[0], OS.get_environment("SHOT_Y").to_float(), v[1])
 		player.set_view(deg_to_rad(v[2]), deg_to_rad(v[3]))
+		if scene.has_method("_update_mist"):
+			scene.call("_update_mist")
 		await _frames(12)
 		# SHOT_DOCS="d01,d02": abre un documento distinto en cada vista (para revisar el overlay).
 		var docs: PackedStringArray = OS.get_environment("SHOT_DOCS").split(",", false)

@@ -17,6 +17,7 @@ var visibility_range: float = 0.0
 var ambient: Color = Color(0.02, 0.02, 0.02)
 var bounce: float = 0.25
 ## Tiles: `height: float` finito > 0 (defecto wall_height; puerta >= 2.1),
+## `floor_y: float` <= 0 (suelo hundido: contrahuella vista y rampa de colisión hacia el vecino),
 ## `edge: StringName` (faldón/inferior), `nav: bool` (false fuerza no transitable),
 ## `zone: String` o `zones: Array[String]` (nombres no vacíos, sin duplicados por celda).
 ## `light.panel: bool` (defecto true; false omite luminaria y difusor),

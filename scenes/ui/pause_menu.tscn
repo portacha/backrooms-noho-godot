@@ -1,7 +1,6 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/pause_menu.gd" id="1_pause"]
-[ext_resource type="PackedScene" path="res://scenes/ui/difficulty_selector.tscn" id="2_selector"]
 [ext_resource type="PackedScene" path="res://scenes/ui/options_panel.tscn" id="3_options"]
 
 [node name="PauseMenu" type="CanvasLayer"]
@@ -55,26 +54,6 @@ custom_minimum_size = Vector2(300, 54)
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 text = "REANUDAR"
-
-[node name="DifficultyCaption" type="Label" parent="Center/Card/Margin/Column"]
-layout_mode = 2
-mouse_filter = 2
-theme_override_colors/font_color = Color(1, 1, 1, 0.55)
-theme_override_font_sizes/font_size = 13
-horizontal_alignment = 1
-text = "DIFICULTAD"
-
-[node name="DifficultySelector" parent="Center/Card/Margin/Column" instance=ExtResource("2_selector")]
-custom_minimum_size = Vector2(380, 48)
-layout_mode = 2
-
-[node name="DifficultyNote" type="Label" parent="Center/Card/Margin/Column"]
-layout_mode = 2
-mouse_filter = 2
-theme_override_colors/font_color = Color(1, 1, 1, 0.45)
-theme_override_font_sizes/font_size = 13
-horizontal_alignment = 1
-text = "surte efecto en el siguiente tramo"
 
 [node name="OptionsButton" type="Button" parent="Center/Card/Margin/Column"]
 custom_minimum_size = Vector2(300, 54)

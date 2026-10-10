@@ -1,7 +1,7 @@
 class_name MainMenu
 extends Control
 ## Menú principal: portada viva, JUGAR inmediato y marca mínima (docs/13 §6.1, docs/06).
-## Debajo de JUGAR: CONTINUAR (si hay partida), dificultad, opciones y créditos.
+## Debajo de JUGAR: CONTINUAR (si hay partida), opciones y créditos.
 
 ## Azul, blanco y naranja del logotipo NOHO; nada más.
 const ACCENT_BLUE: Color = Color("1f5fff")
@@ -14,7 +14,6 @@ const BRAND_URL: String = "https://lovenoho.com"
 @onready var _title: Label = $LeftColumn/Title
 @onready var _play_button: Button = $LeftColumn/PlayButton
 @onready var _continue_button: Button = $LeftColumn/ContinueButton
-@onready var _difficulty_selector: DifficultySelector = $LeftColumn/DifficultySelector
 @onready var _options_button: Button = $LeftColumn/OptionsButton
 @onready var _credits_button: Button = $LeftColumn/CreditsButton
 @onready var _quit_button: Button = $LeftColumn/QuitButton

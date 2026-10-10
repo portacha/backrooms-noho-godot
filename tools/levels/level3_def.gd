@@ -13,6 +13,11 @@ const WARM: Color = Color(1.0, 0.5, 0.18)
 const MAGENTA: Color = Color(1.0, 0.25, 0.7)
 const TUNNEL_HEIGHT: float = 3.4
 const SKULL_STEP: int = 8
+## El agua va en un cauce: el suelo de las celdas inundadas baja y la lámina queda por debajo del
+## suelo seco (`Level3.WATER_LEVEL`), nunca posada encima.
+const BED: float = -0.24
+const SURFACE: float = -0.06
+const FLOATING: Array[String] = ["marigold", "candle", "copal", "wallet"]
 ## Tramos rectos: (columna izquierda, fila inicial, fila final).
 const SECTIONS: Array[Vector3i] = [Vector3i(3, 4, 16), Vector3i(10, 23, 41), Vector3i(18, 48, 68)]
 
@@ -42,14 +47,14 @@ func _init() -> void:
 	var tube: Dictionary = {"color": Color(1.0, 0.95, 0.74), "energy": 1.15, "radius": 9.5, "flicker": true}
 	tiles = {
 		"#": {"solid": true, "wall": &"wall"},
-		".": {"floor": &"floor", "ceiling": &"ceiling", "zone": "water"},
-		",": {"floor": &"floor", "ceiling": &"ceiling", "zone": "water", "light": tube},
+		".": {"floor": &"floor", "ceiling": &"ceiling", "zone": "water", "floor_y": BED},
+		",": {"floor": &"floor", "ceiling": &"ceiling", "zone": "water", "floor_y": BED, "light": tube},
 		"s": {"floor": &"floor", "ceiling": &"ceiling"},
 		"S": {"floor": &"floor", "ceiling": &"ceiling", "light": tube},
 		# Hueco a oscuras: misma obra que el túnel, sin luz propia. Refugio (zona `duct` por compatibilidad).
 		"d": {"floor": &"floor", "ceiling": &"ceiling", "nav": false, "zone": "duct"},
 		"r": {"floor": &"floor", "ceiling": &"ceiling", "zone": "remanso"},
-		"w": {"floor": &"floor", "ceiling": &"ceiling", "zones": ["water", "remanso"]},
+		"w": {"floor": &"floor", "ceiling": &"ceiling", "zones": ["water", "remanso"], "floor_y": BED},
 		"c": {"floor": &"clay", "ceiling": &"clay", "wall": &"clay", "height": 4.4, "zone": "remanso"},
 		"b": {"solid": true, "wall": &"clay"},
 	}
@@ -80,6 +85,7 @@ func _init() -> void:
 	_carve(grid, 21, 72, 21, 74, "d")
 	_backrooms_remnants(grid)
 	rows = PackedStringArray(grid)
+	_wet = grid
 	markers = {
 		"start": Vector3(8, 0, 4), "cp_start": Vector3(8, 0, 4),
 		"cp_r1": Vector3(23, 0, 73), "cp_r1_look": Vector3(23, 0, 79),
@@ -105,6 +111,9 @@ func _backrooms_remnants(grid: Array[String]) -> void:
 			var symbol: String = grid[y][section.x]
 			if symbol in [".", "s"]:
 				grid[y] = grid[y].substr(0, section.x) + ("," if symbol == "." else "S") + grid[y].substr(section.x + 1)
+
+
+var _wet: Array[String] = []
 
 
 func _dress() -> void:
@@ -191,6 +200,21 @@ func _dress() -> void:
 	props.append({"model": "sugar_skull", "pos": Vector3(36.1, 0.0, 141.0), "rot_y": 90.0, "collide": false})
 	props.append({"model": "candle_mid", "pos": Vector3(36.15, 0.0, 141.6), "collide": false})
 	lights.append({"pos": Vector3(36.5, 0.5, 141.4), "color": WARM, "energy": 0.6, "radius": 3.0})
+	_settle()
+
+
+## Lo que cae en celda inundada baja al fondo del cauce; lo que flota se queda en la lámina.
+func _settle() -> void:
+	for prop: Dictionary in props:
+		var at: Vector3 = prop["pos"]
+		var row: int = floori(at.z / 2.0)
+		var column: int = floori(at.x / 2.0)
+		if at.y > 0.3 or row < 0 or row >= _wet.size() or not _wet[row][column] in [".", ",", "w"]:
+			continue
+		var floats: bool = false
+		for word: String in FLOATING:
+			floats = floats or String(prop["model"]).begins_with(word)
+		prop["pos"] = Vector3(at.x, SURFACE - 0.01 if floats else at.y + BED, at.z)
 
 
 func _candles(rng: RandomNumberGenerator, centre: Vector3, count: int, spread: float = 0.9) -> void:

@@ -11,6 +11,8 @@ const ENTITY_SCENE: String = "res://scenes/entity/olvidado.tscn"
 const SWELL_SOUND: String = "res://assets/audio/sfx/letter_swell.ogg"
 ## Margen con el que la entidad llegaría a la puerta después del jugador que no deja de correr.
 const FINAL_CHASE_MARGIN: float = 1.5
+## Altura del centro de cada jirón de bruma sobre el suelo del jugador (`rise` en `mist.gdshader`).
+const MIST_RISE: float = 1.4
 
 ## El Olvidado de este nivel, si lo hay (`spawn_entity`).
 var entity: Olvidado = null
@@ -28,6 +30,10 @@ var fog_backrooms_density: float = 0.012
 var _checkpoints: Array[Dictionary] = []
 var _reality_tween: Tween = null
 var _petal_count: int = 0
+var _mist: MultiMesh = null
+var _mist_material: ShaderMaterial = null
+var _mist_reach: float = 15.0
+var _mist_indoors: bool = true
 
 @onready var geo: Node3D = $Geo
 @onready var player: Player = $Player
@@ -42,14 +48,13 @@ func _ready() -> void:
 	RenderingServer.global_shader_parameter_set(&"flicker_override", -1.0)
 	set_reality(1.0)
 	_spawn_hero_props()
-	# Cansancio sin barra: oscurecimiento periférico leve (docs/13 §3.3).
-	player.exhaustion_changed.connect(func(ratio: float) -> void: screen_fx.vignette = ratio * 0.45)
 	hud.reading_started.connect(_on_reading_changed.bind(true))
 	hud.reading_finished.connect(_on_reading_changed.bind(false))
 
 
 func _process(_delta: float) -> void:
 	_update_checkpoints()
+	_update_mist()
 
 
 func marker(marker_name: String) -> Vector3:
@@ -261,7 +266,7 @@ func spawn_entity(profile_path: String) -> Olvidado:
 	return entity
 
 
-## Leer es el respiro: en Fácil congela la presión, en Difícil la sube (docs/12 §4.5).
+## Leer es el respiro: el ajuste decide si congela la presión, la deja decaer o la sube (docs/12 §4).
 func _on_reading_changed(_document: DocumentData, reading: bool) -> void:
 	if entity == null:
 		return
@@ -278,15 +283,11 @@ func _reading_pressure(rate: float) -> void:
 
 
 ## Carrera final (docs/12 §8.4, docs/13 §11): la entidad, enfurecida, sale de `from` hacia el
-## jugador con el retraso justo para alcanzarlo solo si deja de correr antes de `goal`. El
-## consumo de resistencia se ajusta a la duración del perfil; no hay fallo automático.
+## jugador con el retraso justo para alcanzarlo solo si deja de correr antes de `goal`. No hay
+## fallo automático.
 func begin_final_chase(from: Vector3, goal: Vector3) -> void:
 	var difficulty: Difficulty = Game.difficulty
 	var player_time: float = player.global_position.distance_to(goal) / player.sprint_speed
-	player.restore_stamina()
-	if not difficulty.infinite_stamina and player.sprint_drain > 0.0:
-		var wanted: float = maxf(player_time, difficulty.final_chase_seconds) * (1.15 if difficulty.id == Difficulty.Id.NORMAL else 1.0)
-		player.stamina_drain_scale = minf(1.0, player.max_stamina / (player.sprint_drain * wanted))
 	entity.set_enraged(true)
 	var speed: float = difficulty.entity_chase_speed * entity.profile.speed_scale
 	var delay: float = maxf(0.0, player_time + FINAL_CHASE_MARGIN - from.distance_to(goal) / speed)
@@ -320,7 +321,6 @@ func update_letter_fx(altar: LetterAltar) -> void:
 func play_letter_ritual(altar: LetterAltar, on_mutate: Callable, on_done: Callable, shake_camera: bool = true) -> void:
 	set_can_pause(false)
 	player.controls_enabled = false
-	player.restore_stamina()
 	var swell: AudioStream = load_audio(SWELL_SOUND)
 	if swell != null:
 		play_sound(swell, -1.0)
@@ -517,6 +517,83 @@ func shake(strength: float) -> void:
 		return
 	player.camera.h_offset = randf_range(-1.0, 1.0) * 0.05 * strength
 	player.camera.v_offset = randf_range(-1.0, 1.0) * 0.05 * strength
+
+
+## Bruma de la dimensión oscura: un puñado de jirones que acompañan al jugador y se recolocan
+## fuera de su alcance visible. Con `dual` siguen a `reality` (solo en lo real); con `indoors`
+## solo ocupan celdas transitables. La niebla del
+## `Environment` da la distancia; esto es lo que se ve moverse en el aire y en el haz de la linterna.
+func add_mist(tint: Color, density: float = 0.3, count: int = 14, reach: float = 15.0, dual: bool = true, indoors: bool = true, sheet: Vector2 = Vector2(7.0, 3.6)) -> void:
+	_mist_indoors = indoors
+	_mist_material = ShaderMaterial.new()
+	_mist_material.shader = load("res://shaders/mist.gdshader") as Shader
+	var noise: FastNoiseLite = FastNoiseLite.new()
+	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	noise.frequency = 0.02
+	noise.fractal_octaves = 3
+	var image: Image = noise.get_seamless_image(128, 128)
+	image.generate_mipmaps()
+	_mist_material.set_shader_parameter("noise_tex", ImageTexture.create_from_image(image))
+	_mist_material.set_shader_parameter("density", density)
+	_mist_material.set_shader_parameter("reach", reach)
+	_mist_material.set_shader_parameter("dual", 1.0 if dual else 0.0)
+	set_mist_tint(tint)
+	_mist_reach = reach
+	var quad: QuadMesh = QuadMesh.new()
+	quad.size = sheet
+	_mist = MultiMesh.new()
+	_mist.transform_format = MultiMesh.TRANSFORM_3D
+	_mist.mesh = quad
+	_mist.instance_count = count
+	for i: int in count:
+		_mist.set_instance_transform(i, Transform3D(Basis.IDENTITY, _mist_spot(0.0)))
+	var instance: MultiMeshInstance3D = MultiMeshInstance3D.new()
+	instance.name = "Bruma"
+	instance.multimesh = _mist
+	instance.material_override = _mist_material
+	instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	instance.custom_aabb = AABB(Vector3.ONE * -4096.0, Vector3.ONE * 8192.0)
+	add_child(instance)
+
+
+func set_mist_tint(tint: Color) -> void:
+	if _mist_material != null:
+		_mist_material.set_shader_parameter("tint", Vector3(tint.r, tint.g, tint.b))
+
+
+## Punto para un jirón, entre `inner` y el alcance, a media altura sobre el suelo del jugador.
+func _mist_spot(inner: float) -> Vector3:
+	var at: Vector3 = player.global_position
+	var spot: Vector3 = at
+	# En niveles cerrados solo vale el aire de un pasillo: dentro de un muro no se vería.
+	for attempt: int in 10:
+		var angle: float = randf() * TAU
+		var distance: float = lerpf(inner, 1.0, sqrt(randf())) * _mist_reach
+		spot = Vector3(at.x + cos(angle) * distance, at.y + MIST_RISE, at.z + sin(angle) * distance)
+		if not _mist_indoors or _walkable(spot):
+			break
+	return spot
+
+
+func _walkable(at: Vector3) -> bool:
+	var cell: Vector2i = cell_of(at)
+	var width: int = geo.get_meta("grid_width", 0)
+	var walkable: PackedByteArray = geo.get_meta("walkable", PackedByteArray())
+	if cell.x < 0 or cell.y < 0 or cell.x >= width or cell.y * width + cell.x >= walkable.size():
+		return false
+	return walkable[cell.y * width + cell.x] == 1
+
+
+func _update_mist() -> void:
+	if _mist == null:
+		return
+	var at: Vector3 = player.global_position
+	for i: int in _mist.instance_count:
+		var origin: Vector3 = _mist.get_instance_transform(i).origin
+		var away: float = origin.distance_to(at)
+		# Tras una reaparición quedan todos lejos: se reparten de nuevo alrededor, no solo al borde.
+		if away > _mist_reach * 1.05:
+			_mist.set_instance_transform(i, Transform3D(Basis.IDENTITY, _mist_spot(0.85 if away < _mist_reach * 1.6 else 0.0)))
 
 
 ## Mancha de pétalos a ras de suelo (superficie plana). `hidden` = contaminación por revelar.

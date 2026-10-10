@@ -4,7 +4,6 @@ var entity: Olvidado
 var player: Player
 var screen_fx: ScreenFx
 var errors: Array[String] = []
-var original_difficulty: Difficulty.Id
 var screams: int = 0
 var relocations: int = 0
 var captures: int = 0
@@ -29,8 +28,6 @@ func _physics_process(_delta: float) -> void:
 	if monitor_zones and is_instance_valid(entity) and entity.forbidden(entity.global_position):
 		forbidden_seen = true
 func _run() -> void:
-	original_difficulty = Game.selected_difficulty()
-	Game.select_difficulty(Difficulty.Id.NORMAL)
 	if not ResourceLoader.exists("res://scenes/levels/generated/entity_arena.scn"):
 		print("ENTITY TEST FAIL: falta construir entity_arena")
 		get_tree().quit(1)
@@ -148,25 +145,18 @@ func _run() -> void:
 	await get_tree().create_timer(0.05, true).timeout
 	check(entity.global_position == pause_position, "pausa congela entidad")
 	get_tree().paused = false
-	Game.select_difficulty(Difficulty.Id.EASY)
-	var easy_speed: float = entity.speed(&"Chase")
-	Game.select_difficulty(Difficulty.Id.HARD)
-	check(entity.speed(&"Chase") > easy_speed, "velocidades Fácil/Difícil")
+	check(entity.speed(&"Chase") > entity.speed(&"Investigate") and entity.speed(&"Investigate") > entity.speed(&"Wander"), "velocidades crecientes: deambular < investigar < perseguir")
 	entity.profile = (load("res://resources/entity/profile_level3.tres") as EntityProfile).duplicate() as EntityProfile
-	# Medición física con el mismo objetivo en ambas dificultades.
+	# Medición física: en persecución avanza de verdad hacia el jugador.
 	player.global_position = Vector3(33, 0, 5)
-	var travelled: Array[float] = []
-	for difficulty_id: Difficulty.Id in [Difficulty.Id.EASY, Difficulty.Id.HARD]:
-		Game.select_difficulty(difficulty_id)
-		entity.pressure_frozen = false
-		entity.teleport_to(Vector3(19, 0, 5))
-		entity.stimulus = 100.0
-		entity.face(player.global_position)
-		entity.force_state(&"Chase")
-		await frames(40)
-		travelled.append(entity.global_position.distance_to(Vector3(19, 0, 5)))
-	check(travelled[1] > travelled[0] + 0.2, "velocidad física Difícil mayor que Fácil")
-	print("ENTITY SPEED easy=%.3f hard=%.3f" % [travelled[0], travelled[1]])
+	entity.pressure_frozen = false
+	entity.teleport_to(Vector3(19, 0, 5))
+	entity.stimulus = 100.0
+	entity.face(player.global_position)
+	entity.force_state(&"Chase")
+	await frames(40)
+	var travelled: float = entity.global_position.distance_to(Vector3(19, 0, 5))
+	check(travelled > 1.0, "la persecución avanza (%.2f m en 40 fotogramas)" % travelled)
 	entity.pressure_frozen = false
 	entity.manifest_at(player.global_position + Vector3(1, 0, 0))
 	await frames(2)
@@ -182,7 +172,6 @@ func _run() -> void:
 	check(is_equal_approx(screen_fx.fade, 1.0), "captura termina en negro")
 	print("ENTITY TEST OK" if errors.is_empty() else "ENTITY TEST FAIL (%d)" % errors.size())
 	var result: int = 0 if errors.is_empty() else 1
-	Game.select_difficulty(original_difficulty)
 	for audio: Node in find_children("*", "AudioStreamPlayer", true, false) + find_children("*", "AudioStreamPlayer3D", true, false):
 		audio.call("stop")
 		audio.set("stream", null)

@@ -26,7 +26,8 @@ const BADGE_HOLD: float = 4.0
 const FADE_TIME: float = 2.0
 ## Los primeros 3 s ni Esc ni el toque saltan la secuencia.
 const SKIP_LOCK: float = 3.0
-## El gafete cuelga del cuello, de cara a la cámara (sur). Origen del modelo = su base.
+## El gafete cuelga del cuello, de cara a la cámara (sur). Origen del modelo = arriba,
+## junto al cordón; el cuerpo cuelga debajo.
 const BADGE_POS: Vector3 = Vector3(21.0, 1.155, 3.02)
 const BADGE_TOP: Vector3 = Vector3(21.0, 1.34, 3.02)
 
@@ -137,12 +138,13 @@ func _build_badge() -> void:
 	_badge_pivot = Node3D.new()
 	add_child(_badge_pivot)
 	_badge_pivot.global_position = BADGE_TOP
-	badge = spawn_model("badge_noho", _badge_pivot, 0.35, 1.2)
+	badge = spawn_model("badge_noho", _badge_pivot, 1.5, 1.2)
 	badge.position = BADGE_POS - BADGE_TOP
 	# La cara mira al sur (+z), hacia la cámara: el texto va un poco por delante.
-	_add_badge_label("NOHO", Vector3(0.0, -0.107, 0.016), 32, 0.0006, Color(0.75, 0.88, 1.0))
-	_add_badge_label("COLABORADOR VIGENTE", Vector3(0.0, -0.130, 0.016), 16, 0.0004, Color(0.85, 0.85, 0.84))
-	_add_badge_label("NOHO", Vector3(0.0, -0.150, 0.016), 24, 0.0006, Color(0.9, 0.9, 0.88))
+	# Alturas de las piezas del modelo (pantalla y placa del nombre).
+	_add_badge_label("NOHO", Vector3(0.0, -0.074, 0.010), 32, 0.0006, Color(0.75, 0.88, 1.0))
+	_add_badge_label("COLABORADOR VIGENTE", Vector3(0.0, -0.093, 0.010), 16, 0.0004, Color(0.85, 0.85, 0.84))
+	_add_badge_label("NOHO", Vector3(0.0, -0.105, 0.010), 16, 0.0005, Color(0.9, 0.9, 0.88))
 	var eye: Vector3 = player.camera.global_position
 	var target: Vector3 = badge_center()
 	var flat: Vector2 = Vector2(target.x - eye.x, target.z - eye.z)
