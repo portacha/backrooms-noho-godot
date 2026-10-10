@@ -85,7 +85,7 @@ def main():
         obj.location=direction*24
         obj.rotation_euler=rotation.to_euler()
         scene.camera=obj
-        prefix='models_sheet_new' if names else 'models_sheet'
+        prefix='models_sheet_fix' if names else 'models_sheet'
         scene.render.filepath=str(OUT/f'{prefix}_{sheet}.png')
         bpy.ops.render.render(write_still=True)
         print(f'HOJA {sheet}: {scene.render.filepath}',flush=True)

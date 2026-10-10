@@ -636,10 +636,11 @@ def new_model(name):
         box('Cuello',(0,0,.25),(1.34,1.34,.28),'Concrete',.025)
         for i in range(7): box('Huella encofrado',(-.55+i*.18,-.796,.31),(.09,.008,.16),'Stone')
     elif name=='column_base':
-        box('Zócalo inferior',(0,0,.08),(1.5,1.5,.16),'Concrete',.04)
-        box('Escocia',(0,0,.22),(1.28,1.28,.16),'Concrete',.025)
-        for x,z in ((-.49,.18),(.43,.24),(-.12,.1)):
-            prism('Desconchón',[(x-.09,-.752),(x+.08,-.752),(x+.02,-.748)],0,.01,'Adobe','Y')
+        box('Zócalo inferior',(0,0,.07),(1.5,1.5,.14),'Concrete',.055)
+        box('Escalón',(0,0,.17),(1.34,1.34,.10),'Stone',.035)
+        box('Cuello',(0,0,.265),(1.12,1.12,.09),'Concrete',.025)
+        for x,z in ((-.49,.13),(.43,.16),(-.12,.08)):
+            prism('Adobe expuesto',[(x-.09,-.753),(x-.04,-.758),(x+.08,-.752),(x+.02,-.748)],z,z+.045,'Adobe','Y')
     elif name=='ofrenda_arch':
         # Arco de carrizo con hojas/flores repetidas en la curva.
         for x in (-.9,.9): beam('Poste carrizo',(x,0,0),(x,0,2.05),.09,.09,'Earth')
@@ -654,26 +655,38 @@ def new_model(name):
         slab('Mantel',(0,-.015,.31),(2.02,1.02,.035),'Papel_Magenta',.01)
         for x in [i*.15-.9 for i in range(13)]: beam('Fleco',(x,-.52,.29),(x,-.52,.20),.018,.02,'Papel_Cyan')
     elif name=='papel_picado_string':
-        tube('Cordel',[(-1,0,.42),(-.5,0,.34),(0,0,.32),(.5,0,.34),(1,0,.42)],.009,'Earth',4)
+        tube('Cordel',[(-1,0,.45),(-.5,0,.38),(0,0,.36),(.5,0,.38),(1,0,.45)],.009,'Earth',3)
         for i in range(5):
             x=-.8+i*.4; col=('Papel_Magenta','Papel_Purple','Papel_Cyan')[i%3]
-            prism('Banderín',[(x-.16,-.012,.30),(x+.16,-.012,.30),(x+.13,-.012,.08),(x,-.012,.02),(x-.13,-.012,.08)],-.015,.015,col,'Y')
-            for dx in (-.07,.07): prism('Calado',[(x+dx-.025,-.018,.22),(x+dx+.025,-.018,.22),(x+dx+.02,-.018,.17),(x+dx-.02,-.018,.17)],-.003,.003,'Paper','Y')
+            top=.37-abs(x)*.08
+            outline=[(x-.16,top),(x-.08,top-.035),(x,top),(x+.08,top-.035),(x+.16,top),(x+.14,.06),(x,.03),(x-.14,.06)]
+            prism('Banderín festoneado',outline,-.015,.015,col,'Y')
+            if i in (0,2,4):
+                prism('Calado calavera',[(x-.03,top-.18),(x-.04,top-.15),(x-.02,top-.13),(x+.02,top-.13),(x+.04,top-.15),(x+.03,top-.18),(x+.02,top-.20),(x-.02,top-.20)],-.019,-.016,'Earth','Y')
     elif name in ('sugar_skull','sugar_skull_giant'):
         sx,sy,sz=SPECS[name][0]
-        # Cráneo facetado con mandíbula y cuencas oscuras/fosforescentes.
-        lathe('Cráneo',[(sx*.32,0),(sx*.47,sz*.20),(sx*.5,sz*.62),(sx*.34,sz*.88),(sx*.12,sz)],'Sugar',8)
-        box('Mandíbula',(0,0,sz*.18),(sx*.68,sy*.76,sz*.28),'Sugar_Detail',.02)
+        # Cráneo con mandíbula contigua, cavidades empotradas y ornamento facial.
+        lathe('Cráneo',[(sx*.30,0),(sx*.44,sz*.13),(sx*.48,sz*.55),(sx*.42,sz*.77),(sx*.27,sz*.91),(sx*.12,sz)],'Sugar',10)
+        jaw=[(-sx*.28,sz*.27),(-sx*.34,sz*.18),(-sx*.27,sz*.06),(-sx*.17,sz*.025),(sx*.17,sz*.025),(sx*.27,sz*.06),(sx*.34,sz*.18),(sx*.28,sz*.27)]
+        prism('Mandíbula integrada',jaw,-sy*.48,sy*.48,'Sugar','Y')
+        eye_mat='Glow' if name.endswith('giant') else 'Basalt'
         for x in (-sx*.17,sx*.17):
-            eye=[(x+sx*.075*math.cos(i*math.tau/8),sz*.57+sz*.12*math.sin(i*math.tau/8)) for i in range(8)]
-            prism('Cuenca fosforescente',eye,-sy*.53,-sy*.51,'Glow' if name.endswith('giant') else 'Basalt','Y')
-        for x in (-sx*.18,-sx*.06,.06,.18):
-            box('Diente',(x,-sy*.53,sz*.14),(sx*.045,.012,sz*.10),'Sugar',.004)
-        for i in range(8):
-            a=i*math.tau/8; lathe('Pétalo',[(sx*.025,0),(sx*.07,.012)],'Marigold',(6),(.0+sx*.40*math.cos(a),0,sz*.53+sz*.30*math.sin(a)),'Y')
+            lathe('Cuenca hundida',[(sx*.075,0),(sx*.09,.008)],eye_mat,8,(x,-sy*.465,sz*.58),'Y')
+        for x in (-sx*.18,-sx*.09,0,sx*.09,sx*.18):
+            box('Diente integrado',(x,-sy*.49,sz*.115),(sx*.055,.018,sz*.075),'Sugar_Detail',sx*.012)
+        lathe('Centro flor',[(sx*.045,0),(sx*.052,.012)],'Marigold',8,(0,-sy*.49,sz*.84),'Y')
+        for i in range(4):
+            a=i*math.tau/6
+            lathe('Pétalo frontal',[(sx*.018,0),(sx*.04,.012)],'Marigold',5,(sx*.075*math.cos(a),-sy*.49,sz*.84+sx*.075*math.sin(a)),'Y')
+        for sign in (-1,1):
+            for k in range(3):
+                x=sign*(sx*.25+k*sx*.025)
+                beam('Filigrana pómulo',(x,-sy*.48,sz*.40-k*sz*.08),(x-sign*sx*.045,-sy*.48,sz*.36-k*sz*.08),sx*.018,.012,'Glow' if name.endswith('giant') else 'Marigold')
     elif name=='pan_de_muerto':
         lathe('Pan',[(.075,0),(.105,.025),(.10,.075),(.055,.095)],'Sugar',8)
-        for a in (0,math.pi/2): beam('Huesito',(-.09*math.cos(a),-.09*math.sin(a),.06),(.09*math.cos(a),.09*math.sin(a),.06),.035,.035,'Sugar_Detail')
+        for a in (0,math.pi/2):
+            beam('Huesito cruz',(-.09*math.cos(a),-.09*math.sin(a),.073),(.09*math.cos(a),.09*math.sin(a),.073),.026,.026,'Sugar_Detail')
+        lathe('Bolita central',[(.018,0),(.025,.018)],'Sugar_Detail',6,(0,0,.085))
     elif name=='copal_censer':
         lathe('Copa',[(.055,0),(.10,.05),(.09,.15),(.05,.18)],'Ceramic',8)
         lathe('Pie',[(.035,0),(.06,.06)],'Black_Clay',8,(0,0,.0))
@@ -723,10 +736,16 @@ def new_model(name):
             lathe('Abrazadera',[(.066,0),(.066,.018)],'Rust',8,(x,0,0),'X')
             box('Tornillo',(x,-.063,0),(.035,.02,.035),'Iron',.006)
     elif name=='pipe_elbow_valve':
-        lathe('Tubo vertical',[(.08,0),(.08,.25)],'Iron',8,(0,0,.05))
-        beam('Codo',(0,0,.30),(.18,0,.48),.16,.16,'Iron')
-        lathe('Volante',[(.12,0),(.12,.02)],'Rust',8,(.18,-.02,.48),'Y')
-        beam('Radio',(0,-.14,.48),(.36,-.14,.48),.025,.025,'Iron')
+        lathe('Tubo vertical',[(.065,0),(.065,.31)],'Iron',8,(0,0,.02))
+        lathe('Codo redondo',[(.065,0),(.082,.04),(.082,.08)],'Iron',8,(0,0,.31),'Y')
+        beam('Tubo horizontal',(0,0,.39),(.32,0,.39),.13,.13,'Iron')
+        for loc,axis in (((0,0,.11),'Z'),((.24,0,.39),'X')):
+            lathe('Brida',[(.095,0),(.105,.025),(.095,.05)],'Rust',6,loc,axis)
+        lathe('Aro volante',[(.115,0),(.115,.018)],'Rust',8,(.30,-.02,.39),'Y',False)
+        for i in range(3):
+            a=i*math.pi/2
+            beam('Radio volante',(.30,-.035,.39),(.30+.11*math.cos(a),-.035,.39+.11*math.sin(a)),.018,.018,'Iron')
+        lathe('Cubo volante',[(.035,0),(.035,.035)],'Metal_Grey',8,(.30,-.04,.39),'Y')
     elif name=='duct_grille':
         frame('Marco boca',1.9,1.3,1.5,1.1,.04,'Iron')
         # Rejilla abierta y abatida bajo el hueco.
@@ -745,12 +764,45 @@ def new_model(name):
         slab('Solapa',(0,.045,.018),(.2,.045,.012),'Oak',.01)
         for x in (-.06,0,.06): box('Tarjeta',(x,-.02,.018),(.035,.05,.008),'Paper',.002)
     elif name in ('clay_wall_panel','clay_wall_broken'):
-        broken=name.endswith('broken'); frame('Losa',2.,2.7,1.0 if broken else 1.65,2.0 if broken else 2.35,.25,'Black_Clay',1.35)
-        # Relieves tallados rodean el hueco central.
-        for z in (.32,.70,1.05,1.65,2.,2.35):
-            for x in (-.82,.82):
-                lathe('Flor tallada',[(.035,0),(.11,.025)],'Stone',6,(x,-.16,z),'Y')
-                box('Greca',(x,-.17,z+.13),(.16,.025,.035),'Basalt')
+        broken=name.endswith('broken')
+        if not broken:
+            box('Muro macizo',(0,0,1.35),(2.,.25,2.7),'Black_Clay',.035)
+        else:
+            # Boquete central hasta el suelo: hombros completos y dintel irregular.
+            box('Machón izquierdo',(-.75,0,1.35),(.5,.4,2.7),'Black_Clay',.025)
+            box('Machón derecho',(.75,0,1.35),(.5,.4,2.7),'Black_Clay',.025)
+            box('Dintel quebrado',(0,0,2.38),(1.02,.4,.64),'Black_Clay',.025)
+            # Borde del boquete quebrado, zigzag visible desde ambos lados.
+            for s in (-1,1):
+                beam('Grieta quebrada',(s*.49,-.215,0),(s*.43,-.215,.38),.035,.022,'Basalt')
+                beam('Grieta quebrada',(s*.43,-.215,.38),(s*.51,-.215,.70),.035,.022,'Basalt')
+                beam('Grieta quebrada',(s*.51,-.215,.70),(s*.45,-.215,1.12),.035,.022,'Basalt')
+            # Cascotes dispersos a cada lado del paso.
+            for side in (-1,1):
+                for j in range(2):
+                    x=side*(.62+j*.10); z=.08+(j%2)*.04
+                    prism('Cascote',[(x-.10,-.19),(x+.06,-.22),(x+.12,-.08),(x-.04,-.04)],z,z+.09,'Basalt' if j%2 else 'Stone','Y')
+        # Relieve frontal oaxaqueño: grecas perimetrales, flores y calavera central.
+        for z in (.20,2.50):
+            for x in (-.65,.65): box('Grecas escalonadas',(x,-.145,z),(.16,.03,.04),'Stone')
+        if not broken:
+            for side in (-1,1):
+                for z in (.75,1.45,2.15):
+                    x=side*.82
+                    box('Greca vertical',(x,-.15,z),(.045,.03,.16),'Stone')
+        # Calavera en relieve; las cuencas son pequeños hundimientos oscuros.
+        if not broken:
+            box('Cráneo relieve',(0,-.145,1.48),(.42,.045,.42),'Stone',.08)
+            box('Mandíbula relieve',(0,-.16,1.27),(.28,.035,.10),'Basalt')
+            for x in (-.10,.10): box('Cuenca relieve',(x,-.176,1.52),(.08,.012,.09),'Basalt')
+        # Flores de cempasúchil en las esquinas del panel (también visibles roto).
+        for x,z in ((-.68,.68),(.68,.68),(-.68,2.0),(.68,2.0)):
+            box('Centro cempasúchil',(x,-.16,z),(.08,.035,.08),'Marigold')
+            for dx,dz in ((.09,0),(-.09,0)):
+                box('Pétalo cempasúchil',(x+dx,-.16,z+dz),(.075,.025,.045),'Marigold')
+        # Calados pequeños decorativos, ciegos (no abren paso a través del muro).
+        for x,z in ((-.35,.42),(.35,.42),(-.35,2.25),(.35,2.25)):
+            prism('Calado rombo ciego',[(x,z-.055),(x+.045,z),(x,z+.055),(x-.045,z)],-.181,-.17,'Basalt','Y')
     elif name=='drain_grate':
         frame('Borde desagüe',.8,.8,.7,.7,.04,'Iron')
         for i in range(7): box('Ranura',(i*.095-.285,0,.025),(.025,.68,.018),'Metal_Grey')
@@ -782,10 +834,16 @@ def new_model(name):
                 for xx in (x-.22,x+.22): beam('Neón',(xx,-.06,.1),(xx,-.06,.7),.045,.045,'Glow')
                 beam('Neón',(x-.22,-.06,.4),(x+.22,-.06,.4),.045,.045,'Glow')
     elif name=='papel_picado_bridge':
-        for x in (-.9,-.45,0,.45,.9):
-            prism('Tira',[ (x-.10,-1.),(x+.10,-1.),(x+.10,1.),(x-.10,1.)],-.03,.03,('Papel_Magenta','Papel_Purple','Papel_Cyan')[int((x+1)*2)%3])
-            for y in (-.85,.85): prism('Fleco',[(x-.1,y),(x+.1,y),(x+.06,y-.12),(x,y-.18),(x-.06,y-.12)],-.035,.035,'Papel_Cyan')
-        for x in (-1,1): tube('Tensor',[(x,-1,0),(x,0,.03),(x,1,0)],.012,'Earth',4)
+        # Superficie pisable de tiras continuas, solapadas; vanos menores de 12 cm.
+        for i in range(15):
+            x=i*(2/15)-1+(1/15)
+            col=('Papel_Magenta','Papel_Purple','Papel_Cyan')[i%3]
+            prism('Tira pisable',[(x-1/15,-1.),(x+1/15,-1.),(x+1/15,1.),(x-1/15,1.)],-.025,.025,col)
+        for x in (-.94,.94): tube('Tensor lateral',[(x,-1,0),(x,0,.015),(x,1,0)],.012,'Earth',4)
+        for y in (-.75,-.25,.25,.75): box('Travesaño',(0,y,-.012),(1.9,.035,.02),'Iron')
+        for x in (-.94,.94):
+            for y in (-.92,.92):
+                prism('Fleco lateral',[(x-.04,y),(x+.04,y),(x+.035,y-.07),(x,y-.10),(x-.035,y-.07)],-.03,.03,'Papel_Cyan')
     elif name=='island_underside':
         # La masa cuelga desde z=0 hacia abajo, origen en su cara superior.
         for x,y,s in ((-.52,-.48,.88),(.48,-.42,.80),(-.42,.48,.78),(.52,.48,.76)):
