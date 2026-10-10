@@ -1,242 +1,289 @@
 extends LevelBase
-## Nivel 2 — Las Ofrendas Infinitas. La luz guía y también obliga a apartar la mirada.
+## Nivel 2 — "Las Ofrendas Infinitas" (docs/04, docs/12 §8.2). Contaminación 35 %, doble realidad.
+## Misión: encender la veladora mayor de las tres ofrendas despierta la pirámide de archiveros y
+## hace aparecer la letra O. Amenaza: la primera manifestación de El Olvidado; iluminarlo de
+## lleno lo hace chillar y reaparecer más cerca (docs/12 §6).
 
-const PROFILE: String = "res://resources/entity/profile_level2.tres"
-const HALL_AUDIO: String = "res://assets/audio/ambient/level2_hall_loop.ogg"
-const COPAL_AUDIO: String = "res://assets/audio/ambient/copal_crackle_loop.ogg"
-const COLLAPSE_AUDIO: String = "res://assets/audio/sfx/ofrenda_collapse.ogg"
+signal offering_lit(index: int)
+signal pyramid_awake
 
-var _altar: LetterAltar
-var _entity: Olvidado
-var _active_manifestation: bool = false
-var _manifestation_time: float = 0.0
-var _manifestation_origin: Vector3 = Vector3.ZERO
-var _manifestations: int = 0
-var _budget: int = 3
-var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
-var _mutation_timer: float = 0.0
-var _mutations: int = 0
-var _mutation_models: Array[Node3D] = []
-var _mutation_slots: Array[Vector3] = []
-var _ritual: bool = false
-var _mutation_busy: bool = false
-var _d07_done: bool = false
-var _d08_done: bool = false
-var _d09_done: bool = false
-var _hall: AudioStreamPlayer
-var _copal: Array[AudioStreamPlayer3D] = []
+const WARM: Color = Color(1.0, 0.55, 0.18)
+const OFFERINGS: int = 3
+## Segundos de "realidad" tras encender cada ofrenda antes de que la mente vuelva a tapar la nave.
+const REAL_SECONDS: float = 26.0
+const MANIFEST_SECONDS: float = 25.0
+const FOG_BACKROOMS: Color = Color(0.05, 0.045, 0.02)
+const FOG_REAL: Color = Color(0.04, 0.026, 0.014)
+
+var altar: LetterAltar = null
+var lit_count: int = 0
+var manifestations: int = 0
+
+var _lit: Array[bool] = [false, false, false]
+var _flames: Array[Node3D] = []
+var _spots: Array[Interactable] = []
+var _trails: Array[Array] = []
+var _pyramid_candles: Array[Node3D] = []
+var _relapse_in: float = -1.0
+var _manifest_left: float = 0.0
+var _random_pending: bool = false
+var _random_in: float = 0.0
+var _taken: bool = false
+var _finishing: bool = false
+var _environment: Environment = null
+
 
 func _ready() -> void:
 	super()
-	_rng.randomize()
-	_budget = Game.difficulty.level2_manifestations
-	var checkpoint: String = spawn_at_checkpoint("start", PI)
+	_environment = ($WorldEnvironment as WorldEnvironment).environment
 	player.flashlight.available = true
+	player.flashlight.turn(true)
 	player.sprint_enabled = true
-	_build_concrete_steps()
+	player.camera.far = 120.0
 	set_touch_button(&"flashlight_visible", true)
 	set_touch_button(&"sprint_visible", true)
-	var hall_stream: AudioStream = load_audio(HALL_AUDIO)
-	if hall_stream != null:
-		_hall = add_loop(hall_stream, -7.0)
+	set_reality(0.0)
+
 	_build_documents()
-	_build_offerings_audio()
-	_build_mutations()
-	_altar = add_letter("letter_o", "letter", PI, 4.5)
-	_altar.taken.connect(_on_letter_taken)
-	add_checkpoint("start", "cp_start", 2.0)
-	add_checkpoint("r1", "cp_r1", 2.2)
-	add_checkpoint("r2", "cp_r2", 2.2)
-	_entity = spawn_entity(PROFILE)
-	_entity.profile.attack_enabled = false
-	_entity.screeched.connect(_on_screeched)
-	_entity.relocated.connect(_on_relocated)
-	if checkpoint == "r1":
-		_d07_done = true
-	elif checkpoint == "r2":
-		_d07_done = true
-		_d08_done = true
-		_d09_done = true
-		_altar.is_taken = false
-		_altar.spot.enabled = true
+	_build_offerings()
+	_build_pyramid()
+	_build_audio()
+	spawn_entity("res://resources/entity/profile_level2.tres")
+	entity.screeched.connect(func() -> void: Game.caption("[chillido de estática]"))
+
+	var saved: String = spawn_at_checkpoint("start", -PI * 0.5)
+	# El estado del nivel se reconstruye según el checkpoint: lo encendido sigue encendido.
+	var restored: int = {"r1": 1, "r2": OFFERINGS}.get(saved, 0)
+	for index: int in restored:
+		_light_offering(index, true)
+	if restored == 0:
+		hud.show_line("Otra vez la oficina. ¿O es lo que yo quiero ver?", 4.0)
+
 
 func _process(delta: float) -> void:
 	super(delta)
-	if _altar != null:
-		update_letter_fx(_altar)
-	if _ritual:
-		return
-	_update_reading_state()
+	if altar != null:
+		update_letter_fx(altar)
+	_update_reality(delta)
 	_update_manifestation(delta)
-	_update_mutations(delta)
-	_update_events()
+	for index: int in _flames.size():
+		# Las veladoras mayores aún apagadas laten apenas: se dejan encontrar.
+		if not _lit[index]:
+			_set_flame(_flames[index], 0.25 + 0.2 * sin(Time.get_ticks_msec() * 0.003 + index))
 
-func _build_concrete_steps() -> void:
-	var steps: Array[AudioStream] = []
-	for index: int in 6:
-		var path: String = "res://assets/audio/sfx/footstep_concrete_%02d.wav" % (index + 1)
-		if ResourceLoader.exists(path):
-			steps.append(load(path) as AudioStream)
-	if not steps.is_empty():
-		player.footstep_sounds = steps
+
+# --- Construcción --------------------------------------------------------------------------
 
 func _build_documents() -> void:
-	add_document(marker("d07"), "res://resources/documents/d07.tres", 2.1)
-	add_document(marker("d08"), "res://resources/documents/d08.tres", 2.2)
-	add_document(marker("d09"), "res://resources/documents/d09.tres", 2.1)
+	for id: String in ["d07", "d08", "d09"]:
+		add_document(marker(id), "res://resources/documents/%s.tres" % id, 2.4)
 
-func _build_offerings_audio() -> void:
-	var stream: AudioStream = load_audio(COPAL_AUDIO)
-	if stream == null:
-		return
-	for name: String in ["d07", "d08", "letter"]:
-		var audio: AudioStreamPlayer3D = play_sound_at(stream, marker(name), -8.0, 16.0)
-		audio.finished.connect(func() -> void: audio.play())
-		_copal.append(audio)
 
-func _build_mutations() -> void:
-	for index: int in 3:
-		_mutation_slots.append(marker("mutation_%d" % index))
-		var model: Node3D = spawn_model("ofrenda_arch", self, 0.24, 0.48)
-		model.global_position = _mutation_slots[index]
-		model.visible = false
-		_mutation_models.append(model)
+func _build_offerings() -> void:
+	for index: int in OFFERINGS:
+		var at: Vector3 = marker("offering_%d" % index)
+		var holder: Node3D = Node3D.new()
+		add_child(holder)
+		holder.global_position = at
+		var flame: Node3D = spawn_model("candle_tall", holder, 0.25, 0.3)
+		flame.scale = Vector3.ONE * 3.2
+		_flames.append(flame)
+		var spot: Interactable = add_interactable(at + Vector3(0.0, 0.75, 0.0), 2.6, 1.2)
+		spot.interacted.connect(_light_offering.bind(index))
+		_spots.append(spot)
+		# Reguero de pétalos hacia el siguiente objetivo; aparece al encender esta ofrenda.
+		var target: Vector3 = marker("offering_%d_front" % (index + 1)) if index + 1 < OFFERINGS else marker("pyramid")
+		var from: Vector3 = marker("offering_%d_front" % index)
+		var trail: Array = []
+		var steps: int = int(from.distance_to(target) / 2.4)
+		for step: int in range(1, steps):
+			var point: Vector3 = from.lerp(target, float(step) / steps) + Vector3(sin(step * 1.7) * 0.5, 0.0, cos(step * 2.3) * 0.5)
+			trail.append(add_petals(point, 0.7 + 0.25 * (step % 3), true))
+		_trails.append(trail)
 
-func _update_reading_state() -> void:
-	if hud.is_reading:
-		if _active_manifestation:
-			_entity.vanish()
-			_active_manifestation = false
-		return
-	if _active_manifestation and _entity.visible:
-		return
-	var player_pos: Vector3 = player.global_position
-	for document_id: String in ["d07", "d08", "d09"]:
-		if player_pos.distance_to(marker(document_id)) < 3.5:
-			return
-	if not _d07_done and player_pos.distance_to(marker("d07")) < 5.5:
-		_d07_done = true
-		return
-	if not _d08_done and player_pos.distance_to(marker("d08")) < 5.0:
-		_d08_done = true
-		return
-	if _manifestations == 0 and player_pos.z < marker("manifest_0").z + 8.0 and player_pos.distance_to(marker("manifest_0")) < 12.0:
-		_manifest_at(marker("manifest_0"), false)
-	elif _manifestations == 1 and player_pos.distance_to(marker("manifest_1")) < 6.0:
-		_manifest_random()
-	elif _manifestations >= 2 and _manifestations < _budget - 1 and player_pos.distance_to(marker("manifest_2")) < 7.0:
-		_manifest_random()
 
-func _update_events() -> void:
-	if hud.is_reading or _active_manifestation:
-		return
-	if _manifestations >= 2 and not _d08_done and player.global_position.distance_to(marker("d08")) < 4.0:
-		_d08_done = true
-	if _manifestations >= 2 and not _d09_done and player.global_position.distance_to(marker("d09")) < 3.2:
-		_d09_done = true
-		add_checkpoint("r2", "cp_r2", 0.1)
+func _build_pyramid() -> void:
+	var centre: Vector3 = marker("pyramid")
+	# Veladoras de la cúspide: apagadas hasta que arden las tres ofrendas.
+	for i: int in 8:
+		var angle: float = i * TAU / 8.0
+		var holder: Node3D = Node3D.new()
+		add_child(holder)
+		holder.global_position = centre + Vector3(cos(angle) * 0.75, 2.64 + 1.32 * float(i % 2 == 0) * 0.0, sin(angle) * 0.75)
+		var candle: Node3D = spawn_model("candle_tall", holder, 0.1, 0.02)
+		candle.scale = Vector3.ONE * 1.8
+		_pyramid_candles.append(candle)
 
-func _manifest_random() -> void:
-	if _manifestations >= _budget - 1:
+
+func _build_audio() -> void:
+	var hall: AudioStream = load_audio("res://assets/audio/ambient/level2_hall_loop.ogg")
+	if hall != null:
+		add_loop(hall, -13.0)
+	var copal: AudioStream = load_audio("res://assets/audio/ambient/copal_crackle_loop.ogg")
+	if copal != null:
+		for index: int in OFFERINGS:
+			play_sound_at(copal, marker("offering_%d" % index), -9.0, 14.0)
+
+
+# --- Misión --------------------------------------------------------------------------------
+
+## Encender una ofrenda: la nave se muestra como es durante un rato, y la entidad se deja ver.
+func _light_offering(index: int, restoring: bool = false) -> void:
+	if _lit[index]:
 		return
-	var camera: Camera3D = player.camera
-	var candidates: Array[Vector3] = []
-	for index: int in 6:
+	_lit[index] = true
+	lit_count += 1
+	_spots[index].enabled = false
+	_set_flame(_flames[index], 3.2)
+	for petals: MeshInstance3D in _trails[index]:
+		petals.show()
+	if restoring:
+		if lit_count == OFFERINGS:
+			_wake_pyramid(true)
+		return
+	var ignite: AudioStream = load_audio("res://assets/audio/sfx/letter_ignite.ogg")
+	if ignite != null:
+		play_sound_at(ignite, _flames[index].global_position, -3.0, 20.0)
+	Game.caption("[la veladora prende]")
+	player.restore_stamina()
+	flicker_reality(1.0)
+	offering_lit.emit(index)
+	if lit_count == OFFERINGS:
+		Game.set_checkpoint("r2")
+		_wake_pyramid(false)
+		return
+	_relapse_in = REAL_SECONDS
+	if lit_count == 1:
+		Game.set_checkpoint("r1")
+		# Primera manifestación, guionizada: lejos y de perfil, para aprender a apartar la luz.
+		get_tree().create_timer(5.0).timeout.connect(_manifest.bind(_far_marker()))
+	else:
+		_random_pending = true
+		_random_in = randf_range(10.0, 20.0)
+
+
+func _wake_pyramid(restoring: bool) -> void:
+	for i: int in _pyramid_candles.size():
+		create_tween().tween_callback(_set_flame.bind(_pyramid_candles[i], 3.0)).set_delay(0.0 if restoring else 1.0 + i * 0.18)
+	altar = add_letter("letter_o", "letter", 0.0, 6.2)
+	altar.taken.connect(_take_letter)
+	if not restoring:
+		altar.scale = Vector3.ZERO
+		create_tween().tween_property(altar, "scale", Vector3.ONE, 1.6).set_delay(2.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		hud.show_line("Ahí está. Arriba de todo.", 3.5)
+	pyramid_awake.emit()
+
+
+func _take_letter() -> void:
+	_taken = true
+	entity.vanish()
+	play_letter_ritual(altar, _collapse, _after_ritual)
+
+
+## Punto ciego del ritual: la ofrenda se viene abajo y la entidad se deja ver un instante.
+func _collapse() -> void:
+	var crash: AudioStream = load_audio("res://assets/audio/sfx/ofrenda_collapse.ogg")
+	if crash != null:
+		play_sound(crash, -2.0)
+	Game.caption("[los archiveros se vienen abajo]")
+	for candle: Node3D in _pyramid_candles:
+		_set_flame(candle, 0.02)
+	var centre: Vector3 = marker("pyramid")
+	for i: int in 26:
+		var angle: float = i * TAU / 26.0
+		add_petals(centre + Vector3(cos(angle), 0.0, sin(angle)) * (4.5 + 2.0 * (i % 3)), 2.0)
+	if manifestations < Game.difficulty.level2_manifestations:
+		_manifest(_far_marker())
+
+
+func _after_ritual() -> void:
+	flicker_reality(1.0, 0.6)
+	await get_tree().create_timer(5.0).timeout
+	if not _finishing:
+		_finishing = true
+		entity.vanish()
+		finish_level()
+
+
+# --- Entidad -------------------------------------------------------------------------------
+
+## Marcador de aparición lejano (16–30 m) y fuera del encuadre.
+func _far_marker() -> Vector3:
+	var best: Vector3 = marker("manifest_0")
+	var best_score: float = -INF
+	var index: int = 0
+	while has_marker("manifest_%d" % index):
 		var at: Vector3 = marker("manifest_%d" % index)
-		var screen: Vector2 = camera.unproject_position(at + Vector3.UP)
-		var rect: Rect2 = get_viewport().get_visible_rect()
-		if camera.is_position_behind(at) or not rect.grow(100.0).has_point(screen):
-			candidates.append(at)
-	if candidates.is_empty():
-		return
-	_manifest_at(candidates[_rng.randi_range(0, candidates.size() - 1)], false)
+		var distance: float = at.distance_to(player.global_position)
+		var score: float = -absf(distance - 20.0) - (30.0 if player.camera.is_position_in_frustum(at + Vector3.UP) else 0.0) - (40.0 if distance < 14.0 else 0.0)
+		if score > best_score:
+			best_score = score
+			best = at
+		index += 1
+	return best
 
-func _manifest_at(at: Vector3, look_at_player: bool) -> void:
-	if hud.is_reading or _active_manifestation or _manifestations >= _budget:
+
+func _manifest(at: Vector3) -> void:
+	if _finishing or hud.is_reading or manifestations >= Game.difficulty.level2_manifestations:
 		return
-	_entity.manifest_at(at, look_at_player)
-	_active_manifestation = true
-	_manifestation_time = 0.0
-	_manifestation_origin = at
-	_manifestations += 1
-	Game.caption("[pasos sobre concreto, muy lejos]")
+	manifestations += 1
+	_manifest_left = MANIFEST_SECONDS
+	entity.manifest_at(at, false)
+	# De perfil: mira perpendicular a la línea con el jugador.
+	var to_player: Vector3 = player.global_position - at
+	entity.rotation.y = atan2(to_player.x, to_player.z) + PI * 0.5
+	entity.force_state(&"Wander")
+	Game.caption("[huesos secos — lejos]")
+
 
 func _update_manifestation(delta: float) -> void:
-	if not _active_manifestation:
-		return
-	_manifestation_time += delta
-	if not _entity.visible:
-		_active_manifestation = false
-		return
-	var distance: float = player.global_position.distance_to(_manifestation_origin)
-	if _manifestation_time >= 25.0 or distance > 23.0:
-		_entity.vanish()
-		_active_manifestation = false
-		return
-	if _manifestations == 1 and distance > 22.0:
-		_entity.vanish()
-		_active_manifestation = false
+	if _random_pending and not hud.is_reading and _manifest_left <= 0.0:
+		_random_in -= delta
+		if _random_in <= 0.0:
+			_random_pending = false
+			_manifest(_far_marker())
+	if _manifest_left > 0.0:
+		_manifest_left -= delta
+		var away: bool = entity.global_position.distance_to(player.global_position) > 34.0
+		if (_manifest_left <= 0.0 or away) and entity.current_state() != &"Attack":
+			_manifest_left = 0.0
+			if not player.camera.is_position_in_frustum(entity.global_position + Vector3.UP * 1.3):
+				entity.vanish()
+			else:
+				_manifest_left = 2.0
 
-func _on_screeched() -> void:
-	Game.caption("[un chillido de estática rasga el silencio]")
 
-func _on_relocated(_to: Vector3) -> void:
-	Game.caption("[el eco se apaga detrás de una columna]")
+# --- Doble realidad ------------------------------------------------------------------------
 
-func _update_mutations(delta: float) -> void:
-	if _mutations >= 5 or _active_manifestation or hud.is_reading or _mutation_busy:
+func _update_reality(delta: float) -> void:
+	if _relapse_in > 0.0 and lit_count < OFFERINGS:
+		_relapse_in -= delta
+		# La mente no vuelve a tapar la nave mientras la entidad está a la vista.
+		if _relapse_in <= 0.0:
+			if _manifest_left > 0.0:
+				_relapse_in = 3.0
+			else:
+				blackout_reality(0.0)
+				hud.show_line("…la oficina. Solo es la oficina.", 3.0)
+
+
+func _on_reality_changed() -> void:
+	if _environment == null:
 		return
-	_mutation_timer += delta
-	if _mutation_timer < 32.0:
-		return
-	_mutation_timer = 0.0
-	var camera: Camera3D = player.camera
-	var candidate: int = _mutations % _mutation_models.size()
-	var at: Vector3 = _mutation_slots[candidate]
-	var screen: Vector2 = camera.unproject_position(at)
-	var bounds: Rect2 = get_viewport().get_visible_rect().grow(100.0)
-	if player.global_position.distance_to(at) < 14.0 or (not camera.is_position_behind(at) and bounds.has_point(screen)):
-		return
-	var model: Node3D = _mutation_models[candidate]
-	_mutation_busy = true
-	model.visible = false
-	await get_tree().process_frame
-	model.global_position = marker("mutation_%d" % ((candidate + 1) % _mutation_slots.size()))
-	model.visible = true
-	_mutations += 1
-	_mutation_busy = false
+	# La niebla también tiene dos caras: polvo de oficina o humo de copal.
+	_environment.fog_light_color = FOG_BACKROOMS.lerp(FOG_REAL, reality)
+	_environment.fog_density = lerpf(0.012, 0.03, reality)
 
-func _on_letter_taken() -> void:
-	if _ritual:
-		return
-	_ritual = true
-	var collapse: AudioStream = load_audio(COLLAPSE_AUDIO)
-	if collapse != null:
-		play_sound(collapse, -1.0)
-	Game.caption("[los archiveros ceden; la ofrenda se desploma]")
-	play_letter_ritual(_altar, _collapse_offering, _finish_ritual, true)
 
-func _collapse_offering() -> void:
-	for model: Node3D in _mutation_models:
-		model.visible = true
-		model.scale = Vector3(1.0, 4.5, 1.0)
-	for i: int in 18:
-		var angle: float = TAU * float(i) / 18.0
-		add_petals(marker("altar") + Vector3(cos(angle) * 5.0, 0.0, sin(angle) * 4.0), 2.2)
-	if _entity != null and _manifestations < _budget:
-		var at: Vector3 = marker("manifest_4")
-		_entity.manifest_at(at, false)
-		_manifestations += 1
-		get_tree().create_timer(4.0).timeout.connect(func() -> void:
-			if is_instance_valid(_entity):
-				_entity.vanish()
-		)
-
-func _finish_ritual() -> void:
-	if _hall != null:
-		_hall.stop()
-	for audio: AudioStreamPlayer3D in _copal:
-		audio.stop()
-	player.controls_enabled = true
-	await get_tree().create_timer(2.5).timeout
-	finish_level(Color(0.03, 0.01, 0.006), 1.7)
+## Brillo de la llama (y del cuerpo de cera) de una veladora dinámica.
+func _set_flame(root: Node3D, energy: float) -> void:
+	for node: Node in root.find_children("*", "MeshInstance3D", true, false):
+		var instance: MeshInstance3D = node as MeshInstance3D
+		for surface: int in instance.mesh.get_surface_count():
+			var source: Material = instance.mesh.surface_get_material(surface)
+			var material: StandardMaterial3D = instance.get_surface_override_material(surface) as StandardMaterial3D
+			if material == null or source == null:
+				continue
+			if source.resource_name == "Flame":
+				material.emission = WARM
+				material.emission_energy_multiplier = energy

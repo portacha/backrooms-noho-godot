@@ -21,8 +21,13 @@ var _beacons: Array[Node3D] = []
 var _alarm: AudioStreamPlayer
 var _candles: Array[Node3D] = []
 var _emergency_time: float = 0.0
-var _shared: ShaderMaterial
+var _path_shader: Shader
 var _reveals: PackedFloat32Array = PackedFloat32Array()
+var _motes: CPUParticles3D
+
+const MAGENTA: Color = Color(1.0, 0.16, 0.62)
+const CANDLE: Color = Color(1.0, 0.55, 0.16)
+const ALARM: Color = Color(1.0, 0.03, 0.04)
 
 func _ready() -> void:
 	super()
@@ -30,12 +35,9 @@ func _ready() -> void:
 		set_process(false)
 		push_error("Nivel 4 requiere reconstruir su geometría.")
 		return
-	_shared = ShaderMaterial.new()
-	_shared.shader = load("res://shaders/petal_path.gdshader") as Shader
-	if ResourceLoader.exists("res://assets/textures/petals_path.png"):
-		_shared.set_shader_parameter("petals", load("res://assets/textures/petals_path.png"))
-	_reveals.resize(128)
-	_shared.set_shader_parameter("path_reveals", _reveals)
+	# El vacío se mira lejos: el neón de la puerta se ve desde el altar, a 75 m.
+	player.camera.far = 260.0
+	_path_shader = load("res://shaders/petal_path.gdshader") as Shader
 	player.flashlight.available = true
 	player.sprint_enabled = true
 	var checkpoint: String = spawn_at_checkpoint("start", PI)
@@ -58,10 +60,6 @@ func _ready() -> void:
 			add_document(marker(id), path, 2.2)
 	altar = add_letter("letter_o", "letter", PI)
 	altar.taken.connect(_take_letter)
-	# El neón ya es emisivo; prescindir del halo evita un séptimo material.
-	for child: Node in altar.get_children():
-		if child is MeshInstance3D:
-			child.queue_free()
 	_build_paths()
 	_reveal_sound = load_audio("res://assets/audio/sfx/petal_reveal.wav")
 	_optional_loop("res://assets/audio/ambient/level4_abyss_loop.ogg", -11.0)
@@ -72,14 +70,14 @@ func _ready() -> void:
 	_door_open = _model("oak_door_open", marker("door"), 0.15)
 	if _door_open != null:
 		_door_open.visible = false
-	_model("neon_noho_sign", marker("neon"), 0.15, 2.5, PI, true)
-	_fix_neon_order()
+	_build_neon()
+	_build_motes()
 	for at: Vector3 in [Vector3(58.8, 0, 70), Vector3(63.2, 0, 70), Vector3(61.7, 0, 85), Vector3(60.3, 0, 113), Vector3(63, 0, 143)]:
-		var beacon: Node3D = _model("emergency_beacon", at, 0.08, 0.0)
+		var beacon: Node3D = _model("emergency_beacon", at, 0.08, 0.02)
 		if beacon != null:
 			_beacons.append(beacon)
 	for i: int in 10:
-		var candle: Node3D = _model("candle_tall", marker("altar") + Vector3(-1.8 + (i % 2) * 3.6, 0, (i / 2) * 0.3), 0.1, 0.0)
+		var candle: Node3D = _model("candle_tall", marker("altar") + Vector3(-1.8 + (i % 2) * 3.6, 0, (i / 2) * 0.3), 0.1, 0.02)
 		if candle != null:
 			_candles.append(candle)
 
@@ -90,6 +88,7 @@ func _process(delta: float) -> void:
 	if not chase_started:
 		entity.pressure_frozen = true
 	update_letter_fx(altar)
+	_motes.global_position = player.global_position
 	_reveal_cooldown = maxf(0.0, _reveal_cooldown - delta)
 	_update_paths(delta)
 	if not _falling and player.global_position.y < -6.0:
@@ -107,26 +106,25 @@ func _process(delta: float) -> void:
 			_cross_door()
 
 func _build_paths() -> void:
+	var texture: Texture2D = load("res://assets/textures/petals_path.png") as Texture2D
 	for point: Node in geo.get_node("Markers").get_children():
 		if not String(point.name).begins_with("path_"):
 			continue
 		var quad: QuadMesh = QuadMesh.new()
 		quad.size = Vector2(0.85, 1.95)
-		var arrays: Array = quad.surface_get_arrays(0)
-		var codes: PackedVector2Array = PackedVector2Array()
-		for i: int in 4:
-			codes.append(Vector2(0, _paths.size()))
-		arrays[Mesh.ARRAY_TEX_UV2] = codes
-		var mesh: ArrayMesh = ArrayMesh.new()
-		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+		var material: ShaderMaterial = ShaderMaterial.new()
+		material.shader = _path_shader
+		material.set_shader_parameter("petals", texture)
 		var path: MeshInstance3D = MeshInstance3D.new()
-		path.mesh = mesh
-		path.material_override = _shared
+		path.mesh = quad
+		path.material_override = material
 		path.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(path)
-		path.global_position = (point as Node3D).global_position + Vector3.UP * 0.025
+		path.global_position = (point as Node3D).global_position + Vector3.UP * 0.03
 		path.rotation.x = -PI * 0.5
 		_paths.append(path)
+	_reveals.resize(_paths.size())
+
 
 func _update_paths(delta: float) -> void:
 	for index: int in _paths.size():
@@ -134,12 +132,98 @@ func _update_paths(delta: float) -> void:
 		var old: float = _reveals[index]
 		var lit: bool = player.flashlight.is_lighting(path.global_position)
 		_reveals[index] = move_toward(old, 1.0 if lit else 0.0, delta * (3.0 if lit else 0.12))
+		if _reveals[index] != old:
+			(path.material_override as ShaderMaterial).set_shader_parameter("reveal", _reveals[index])
 		if lit and old < 0.1 and _reveal_cooldown <= 0.0:
 			_reveal_cooldown = 2.5
 			if _reveal_sound != null:
 				play_sound_at(_reveal_sound, path.global_position, -17.0, 10.0)
 			Game.caption("[los pétalos resplandecen]", 2.0)
-	_shared.set_shader_parameter("path_reveals", _reveals)
+
+
+## El neón de la puerta: lo único que atraviesa toda la niebla (docs/13 §11). Ni él ni su halo
+## reciben niebla; el halo es resplandor (disco aditivo), no un objeto.
+func _build_neon() -> void:
+	var sign: Node3D = _model("neon_noho_sign", marker("neon"), 0.1, 4.0, PI)
+	if sign == null:
+		return
+	_set_glow(sign, MAGENTA, 4.0, true)
+	# El trazo diagonal de la N viene invertido en el modelo: se voltea sobre su propio centro.
+	var diagonal: MeshInstance3D = sign.find_child("*002*", true, false) as MeshInstance3D
+	if diagonal != null:
+		var centre: float = diagonal.get_aabb().get_center().x
+		diagonal.scale.x = -1.0
+		diagonal.position.x += 2.0 * centre
+		for surface: int in diagonal.mesh.get_surface_count():
+			(diagonal.get_surface_override_material(surface) as StandardMaterial3D).cull_mode = BaseMaterial3D.CULL_DISABLED
+	var falloff: Gradient = Gradient.new()
+	falloff.set_color(0, Color.WHITE)
+	falloff.set_color(1, Color(1.0, 1.0, 1.0, 0.0))
+	var texture: GradientTexture2D = GradientTexture2D.new()
+	texture.gradient = falloff
+	texture.fill = GradientTexture2D.FILL_RADIAL
+	texture.fill_from = Vector2(0.5, 0.5)
+	texture.fill_to = Vector2(1.0, 0.5)
+	var material: StandardMaterial3D = StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	material.albedo_color = Color(MAGENTA.r, MAGENTA.g, MAGENTA.b, 0.42)
+	material.albedo_texture = texture
+	material.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	material.disable_fog = true
+	var quad: QuadMesh = QuadMesh.new()
+	quad.size = Vector2(11.0, 7.0)
+	var halo: MeshInstance3D = MeshInstance3D.new()
+	halo.mesh = quad
+	halo.material_override = material
+	add_child(halo)
+	halo.global_position = marker("neon") + Vector3(0.0, -0.3, -0.4)
+
+
+## Pétalos que suben despacio desde el abismo, alrededor del jugador: dan escala al vacío.
+func _build_motes() -> void:
+	var quad: QuadMesh = QuadMesh.new()
+	quad.size = Vector2(0.12, 0.09)
+	var material: StandardMaterial3D = StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.albedo_color = Color(1.0, 0.5, 0.12)
+	material.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	quad.material = material
+	_motes = CPUParticles3D.new()
+	_motes.mesh = quad
+	_motes.amount = 260
+	_motes.lifetime = 14.0
+	_motes.preprocess = 14.0
+	_motes.local_coords = false
+	_motes.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	_motes.emission_box_extents = Vector3(26.0, 9.0, 26.0)
+	_motes.direction = Vector3.UP
+	_motes.spread = 25.0
+	_motes.gravity = Vector3.ZERO
+	_motes.initial_velocity_min = 0.15
+	_motes.initial_velocity_max = 0.5
+	_motes.angular_velocity_min = -60.0
+	_motes.angular_velocity_max = 60.0
+	_motes.scale_amount_min = 0.6
+	_motes.scale_amount_max = 1.8
+	add_child(_motes)
+
+
+## Cambia el brillo de las superficies especiales (`Glow`, `Flame`) de un modelo dinámico.
+func _set_glow(root: Node3D, color: Color, energy: float, no_fog: bool = false) -> void:
+	for node: Node in root.find_children("*", "MeshInstance3D", true, false):
+		var instance: MeshInstance3D = node as MeshInstance3D
+		for surface: int in instance.mesh.get_surface_count():
+			var source: Material = instance.mesh.surface_get_material(surface)
+			var material: StandardMaterial3D = instance.get_surface_override_material(surface) as StandardMaterial3D
+			if source == null or material == null or source.resource_name not in ["Glow", "Flame", "Screen"]:
+				continue
+			material.emission = color
+			material.emission_energy_multiplier = energy
+			material.disable_fog = no_fog
+
 
 func _reset_bridge() -> void:
 	_falling = true
@@ -173,18 +257,20 @@ func _take_letter() -> void:
 	# El altar no gasta otro temblor: el único es la ruptura que sigue.
 	play_letter_ritual(altar, _break_world, _start_chase, false)
 	for i: int in _candles.size():
-		create_tween().tween_callback(_ignite.bind(_candles[i], Color(1, 0.5, 0.12), 2.5)).set_delay(i * 0.09)
+		create_tween().tween_callback(_set_glow.bind(_candles[i], CANDLE, 3.0)).set_delay(i * 0.09)
 
 func _break_world() -> void:
 	entity.vanish()
-	_shared.set_shader_parameter("emergency", 1.0)
 	var environment: Environment = ($WorldEnvironment as WorldEnvironment).environment
-	environment.fog_light_color = Color(0.09, 0.008, 0.015)
+	environment.fog_light_color = Color(0.11, 0.008, 0.016)
+	var sky: ProceduralSkyMaterial = environment.sky.sky_material as ProceduralSkyMaterial
+	sky.sky_horizon_color = Color(0.3, 0.012, 0.03)
+	sky.ground_horizon_color = Color(0.3, 0.012, 0.03)
 	screen_fx.distortion = 0.35
 	create_tween().tween_property(screen_fx, "distortion", 0.0, 1.6)
 	create_tween().tween_method(shake, 1.0, 0.0, 1.2)
 	for beacon: Node3D in _beacons:
-		_ignite(beacon, Color(1, 0.005, 0.015), 3.0)
+		_set_glow(beacon, ALARM, 4.0)
 	_alarm = _optional_loop("res://assets/audio/ambient/alarm_red_loop.ogg", -4.0)
 	Game.caption("[alarma; el vacío cruje]", 4.0)
 
@@ -227,90 +313,14 @@ func _cross_door() -> void:
 	await get_tree().create_timer(0.5).timeout
 	finish_level(Color.BLACK, 0.0)
 
-func _model(model: String, at: Vector3, glow: float, special_glow: float = 2.5, yaw: float = PI, mirror_x: bool = false) -> Node3D:
+func _model(model: String, at: Vector3, glow: float, special_glow: float = 2.5, yaw: float = PI) -> Node3D:
 	if not ResourceLoader.exists("res://assets/models/%s.glb" % model):
 		return null
 	var result: Node3D = spawn_model(model, self, glow, special_glow)
 	result.global_position = at
 	result.rotation.y = yaw
-	# El tubo del neón solo tiene frontal por una cara: al verlo por detrás
-	# (lado de llegada) hay que espejarlo para que NOHO se lea al derecho.
-	if mirror_x:
-		result.scale.x = -result.scale.x
 	return result
 
-func _ignite(model_node: Node3D, _color: Color, _energy: float) -> void:
-	if model_node.has_meta("candle_index"):
-		_shared.set_shader_parameter("candles", float(model_node.get_meta("candle_index")) + 1.0)
-
-## El tubo del neón llega con el orden al revés visto desde la llegada
-## (OHON): reubica cada tubo al otro lado del centro, sin deformarlos,
-## para que desde el puente se lea NOHO con las letras intactas.
-func _fix_neon_order() -> void:
-	for node: Node in find_children("*", "MeshInstance3D", true, false):
-		var instance: MeshInstance3D = node as MeshInstance3D
-		var mesh: ArrayMesh = instance.mesh as ArrayMesh
-		if mesh == null or mesh.get_surface_count() < 1:
-			continue
-		var raw_codes: Variant = mesh.surface_get_arrays(0)[Mesh.ARRAY_TEX_UV2]
-		if not (raw_codes is PackedVector2Array):
-			continue
-		var codes: PackedVector2Array = raw_codes
-		if codes.is_empty() or absf(codes[0].x - 4.0) > 0.1:
-			continue
-		var total: int = 0
-		var center: Vector3 = Vector3.ZERO
-		for surface: int in mesh.get_surface_count():
-			var arrays: Array = mesh.surface_get_arrays(surface)
-			for v: Vector3 in (arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array):
-				center += v
-				total += 1
-		if total == 0:
-			continue
-		center /= float(total)
-		var in_level: Vector3 = to_local(instance.to_global(center))
-		instance.global_position += global_transform.basis * Vector3(-2.0 * in_level.x, 0.0, 0.0)
-func spawn_model(model: String, parent: Node3D, glow: float = 0.35, special_glow: float = 2.5) -> Node3D:
-	var resource: String = "res://assets/models/%s.glb" % model
-	if not ResourceLoader.exists(resource):
-		return null
-	var root: Node3D = (load(resource) as PackedScene).instantiate() as Node3D
-	parent.add_child(root)
-	if model.begins_with("candle_"):
-		root.set_meta("candle_index", _candles.size())
-	for node: Node in root.find_children("*", "MeshInstance3D", true, false):
-		var instance: MeshInstance3D = node as MeshInstance3D
-		var merged: ArrayMesh = ArrayMesh.new()
-		for surface: int in instance.mesh.get_surface_count():
-			var source: BaseMaterial3D = instance.get_active_material(surface) as BaseMaterial3D
-			var arrays: Array = instance.mesh.surface_get_arrays(surface)
-			var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
-			var colors: PackedColorArray = PackedColorArray()
-			var codes: PackedVector2Array = PackedVector2Array()
-			var color: Color = source.albedo_color if source != null else Color.WHITE
-			var kind: float = 1.0
-			var energy: float = glow
-			if source != null and source.resource_name in ["Flame", "Glow"]:
-				kind = 2.0 if source.resource_name == "Flame" else 3.0
-				energy = float(_candles.size()) if kind == 2.0 else special_glow
-				if model == "neon_noho_sign":
-					kind = 4.0
-					color = Color(1, 0.02, 0.45)
-					energy = 5.0
-			if model == "letter_o":
-				kind = 5.0
-				color = Color(1, 0.65, 0.8)
-				energy = 2.6
-			for i: int in vertices.size():
-				colors.append(color)
-				codes.append(Vector2(kind, energy))
-			arrays[Mesh.ARRAY_COLOR] = colors
-			arrays[Mesh.ARRAY_TEX_UV2] = codes
-			merged.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-		instance.mesh = merged
-		instance.material_override = _shared
-		instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	return root
 
 func _sound(file: String, volume: float) -> void:
 	var stream: AudioStream = load_audio("res://assets/audio/sfx/" + file)

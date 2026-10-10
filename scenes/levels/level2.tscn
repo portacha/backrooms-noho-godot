@@ -16,12 +16,12 @@ ambient_light_color = Color(0, 0, 0, 1)
 ambient_light_energy = 0.0
 tonemap_mode = 2
 glow_enabled = true
-glow_intensity = 0.8
-glow_bloom = 0.05
-glow_hdr_threshold = 0.95
+glow_intensity = 1.0
+glow_bloom = 0.12
+glow_hdr_threshold = 0.85
 fog_enabled = true
 fog_light_color = Color(0.045, 0.026, 0.012, 1)
-fog_density = 0.065
+fog_density = 0.012
 fog_sky_affect = 0.0
 
 [node name="Level2" type="Node3D"]

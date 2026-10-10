@@ -8,20 +8,36 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/pause_menu.tscn" id="6_pause"]
 [ext_resource type="PackedScene" path="res://scenes/ui/touch_controls.tscn" id="7_touch"]
 
+[sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
+sky_top_color = Color(0.006, 0.005, 0.02, 1)
+sky_horizon_color = Color(0.075, 0.03, 0.12, 1)
+sky_curve = 0.09
+sky_energy_multiplier = 1.0
+ground_bottom_color = Color(0.0, 0.0, 0.006, 1)
+ground_horizon_color = Color(0.075, 0.03, 0.12, 1)
+ground_curve = 0.05
+sun_angle_max = 0.0
+sun_curve = 0.0
+
+[sub_resource type="Sky" id="Sky"]
+sky_material = SubResource("SkyMat")
+
 [sub_resource type="Environment" id="Env"]
-background_mode = 1
-background_color = Color(0, 0, 0, 1)
+background_mode = 2
+sky = SubResource("Sky")
+fog_sky_affect = 0.0
+background_color = Color(0.012, 0.009, 0.03, 1)
 ambient_light_source = 2
 ambient_light_color = Color(0, 0, 0, 1)
 ambient_light_energy = 0.0
 tonemap_mode = 2
 glow_enabled = true
-glow_intensity = 0.7
-glow_bloom = 0.04
-glow_hdr_threshold = 0.95
+glow_intensity = 1.0
+glow_bloom = 0.14
+glow_hdr_threshold = 0.8
 fog_enabled = true
-fog_light_color = Color(0.014, 0.017, 0.027, 1)
-fog_density = 0.025
+fog_light_color = Color(0.022, 0.016, 0.05, 1)
+fog_density = 0.011
 
 [node name="Level4" type="Node3D"]
 script = ExtResource("1_level")
