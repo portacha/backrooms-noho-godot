@@ -223,8 +223,8 @@ La descarga prueba acceso técnico e integridad, **no adecuación artística ni 
 | Caso | ¿Meshy? |
 |---|---|
 | **El Olvidado** (malla orgánica, esqueleto, animaciones) | **Sí**: es el motivo de tener la clave |
-| Otro elemento **orgánico o esculpido** que por script de Blender queda pobre (calavera gigante, relieve de barro negro, roca) | Sí, si es importante y tras intentar el modelado propio |
-| Mobiliario, arquitectura, utilería geométrica, letras, piezas de marca | **No**: Blender por script (`tools/blender/build_models.py`), como siempre |
+| **Elementos principales** de cada nivel: lo que el jugador mira de cerca o identifica el lugar, sobre todo si es **orgánico o esculpido** (calaveras de azúcar, arco de la ofrenda, muro de barro negro, copalero, flores, pan de muerto, puerta de roble, roca) | **Sí** (decisión del usuario, 2026-10-09: los hechos por script quedaban feos). Se convierten a **materiales de color plano** con `tools/blender/adapt_meshy_prop.py` para que el constructor los funda como a los demás |
+| Mobiliario, arquitectura, utilería geométrica (tuberías, rejillas, puentes), letras, letrero de neón, gafete y demás piezas de marca | **No**: Blender por script (`tools/blender/build_models.py`), como siempre |
 | Relleno secundario | No: stock CC0 primero (este documento) |
 
 Meshy no sustituye la regla dura 10 ni la estética: lo generado se **adapta** (escala, origen, reducción de polígonos, paleta oscura y desaturada) antes de entrar al juego.
