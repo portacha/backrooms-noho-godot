@@ -9,7 +9,8 @@ from mathutils import Vector, Matrix
 ROOT = Path(__file__).resolve().parents[2]
 PALETTE = dict(zip(
     'White_Laminate Office_Green Green_Fabric Beige_Plastic Beige_Dark Dark_Plastic Metal_Grey Metal_Dark Walnut Pine Pine_Dark Cardboard Tape Paper Orange_Mug Wax Wax_Shadow Wick Ceiling_Tile Counter_Yellow Counter_Top Rubber Water_Blue Bubble_Wrap Aluminium Sign_Off Flame Glow Screen'.split(),
-    'D9DAD6 1F4634 2A5A45 C2B79E 9C927B 17191B 7F8587 3A3E40 3E2A1D A8845A 8A6A45 A07C55 CDBE9A E2DFD2 E8822A E6DDC2 C9BC98 2A2622 B9AF8E 8B7A46 5A5138 101112 8FB4C8 C9D2D4 A9AEB0 2B302C FFB44C EAF4FF 0A1020'.split()))
+    'D9DAD6 1F4634 2A5A45 C2B79E 9C927B 17191B 7F8587 3A3E40 3E2A1D A8845A 8A6A45 A07C55 CDBE9A E2DFD2 E8822A E6DDC2 C9BC98 2A2622 B9AF8E 8B7A46 5A5138 101112 8FB4C8 C9D2D4 A9AEB0 2B302C FFB44C EAF4FF 0A1020 Concrete Adobe Basalt Marigold Papel_Magenta Papel_Purple Papel_Cyan Sugar Sugar_Detail Black_Clay Rust Oak Oak_Dark Iron Stone Earth Ceramic'.split()))
+PALETTE.update(dict(zip('Concrete Adobe Basalt Marigold Papel_Magenta Papel_Purple Papel_Cyan Sugar Sugar_Detail Black_Clay Rust Oak Oak_Dark Iron Stone Earth Ceramic'.split(), '777875 76503C 282D32 E88A16 D83E8C 734D9E 55B8C8 F2E9D5 D7B875 17191B 78402C 68462F 39271E 45494A 45413A 47362C 17191B 77716A'.split())))
 SPECS = {
     'ceiling_fixture': ((1.28,.68,.10),500),
     'desk_office': ((1.5,.75,.74),400), 'chair_office': ((.6,.6,.95),900),
@@ -34,12 +35,33 @@ SPECS = {
     'logo_plate': ((1.5,.045,.46),160), 'door_portal': ((2.32,.106,2.34),80),
     'column_round': ((.4,.38,2.8),160), 'bench_waiting': ((1.6,.48,.48),160),
     'planter': ((.58,.69,1.24),240),
+    'letter_o': ((.5,.1,.62),200), 'letter_h': ((.5,.1,.62),140),
+    'column_capital': ((1.6,1.6,.5),220), 'column_base': ((1.5,1.5,.35),220),
+    'ofrenda_arch': ((2.4,.5,2.6),1100), 'ofrenda_tier': ((2.,1.,.45),260),
+    'papel_picado_string': ((2.,.03,.45),260), 'sugar_skull': ((.2,.24,.22),600),
+    'pan_de_muerto': ((.22,.22,.1),120), 'copal_censer': ((.2,.2,.26),240),
+    'marigold_vase': ((.3,.3,.5),360), 'marigold_pile': ((.9,.9,.18),700),
+    'photo_frame_empty': ((.18,.08,.25),100), 'adobe_rubble': ((1.3,.9,.6),400),
+    'stone_stele': ((.9,.35,1.7),600), 'wallpaper_peel': ((1.2,.06,1.4),100),
+    'cabinet_rusty_stack': ((.5,.62,2.66),700), 'sugar_skull_giant': ((1.4,1.3,1.1),600),
+    'pipe_run': ((2.,.2,.3),360), 'pipe_elbow_valve': ((.5,.3,.6),260),
+    'duct_grille': ((1.9,.08,1.3),220), 'ledge_walkway': ((2.,.6,.25),280),
+    'marigold_raft': ((.7,.7,.07),340), 'wallet_open': ((.2,.1,.03),220),
+    'clay_wall_panel': ((2.,.25,2.7),500), 'clay_pot_black': ((.4,.4,.45),240),
+    'clay_wall_broken': ((2.,.4,2.7),500), 'drain_grate': ((.8,.8,.04),160),
+    'oak_door_monumental': ((2.6,.5,3.8),1600), 'oak_door_open': ((2.6,1.4,3.8),1600),
+    'neon_noho_sign': ((2.8,.12,.8),360), 'papel_picado_bridge': ((2.,2.,.06),340),
+    'island_underside': ((2.,2.,1.6),320), 'stalagmite': ((.7,.7,1.9),180),
+    'emergency_beacon': ((.22,.22,.3),140), 'door_frame_lone': ((1.2,.16,2.2),260),
+    'petal_cairn': ((.5,.5,.35),360), 'badge_noho': ((.086,.012,.13),280),
 }
 # Las medidas nominales excluyen asa, pies de partición y solapas abiertas.
 MATS = {}
 # Letreros y piezas de pared: cuelgan de pared o techo, su origen no va al suelo.
-SIGNS = ('sign_wall','sign_wall_right','sign_wall_left','sign_hanging','frame_small','logo_plate')
-CEILING_MODELS = ('ceiling_fixture',)
+SIGNS = ('sign_wall','sign_wall_right','sign_wall_left','sign_hanging','frame_small','logo_plate',
+         'wallpaper_peel','pipe_run','pipe_elbow_valve','duct_grille','clay_wall_panel','clay_wall_broken',
+         'neon_noho_sign','door_frame_lone','badge_noho','letter_n','letter_o','letter_h')
+CEILING_MODELS = ('ceiling_fixture','column_capital','papel_picado_string','sugar_skull_giant','island_underside')
 
 
 def material(name):
@@ -595,6 +617,222 @@ def letter_n():
     bevel(prism('N sólida',outline,-.05,.05,'Glow','Y'),.006)
 
 
+# Modelos añadidos para las ofrendas, conductos y el umbral abisal.
+def letter_o():
+    # Tubo facetado en cuatro tramos; el hueco central queda completamente abierto.
+    for x in (-.19,.19): box('Costado neón',(x,0,0),(.12,.1,.62),'Glow',.018)
+    for z in (-.25,.25): box('Puente neón',(0,0,z),(.26,.1,.12),'Glow',.018)
+
+
+def letter_h():
+    for x in (-.19,.19): box('Montante',(x,0,.31),(.12,.1,.62),'Glow',.018)
+    box('Travesaño',(0,0,.31),(.5,.1,.12),'Glow',.018)
+
+
+def new_model(name):
+    # Cada pieza es una pequeña composición; los volúmenes se biselan y se acompañan de detalles.
+    if name=='column_capital':
+        box('Placa de carga',(0,0,.42),(1.6,1.6,.22),'Concrete',.04)
+        box('Cuello',(0,0,.25),(1.34,1.34,.28),'Concrete',.025)
+        for i in range(7): box('Huella encofrado',(-.55+i*.18,-.796,.31),(.09,.008,.16),'Stone')
+    elif name=='column_base':
+        box('Zócalo inferior',(0,0,.08),(1.5,1.5,.16),'Concrete',.04)
+        box('Escocia',(0,0,.22),(1.28,1.28,.16),'Concrete',.025)
+        for x,z in ((-.49,.18),(.43,.24),(-.12,.1)):
+            prism('Desconchón',[(x-.09,-.752),(x+.08,-.752),(x+.02,-.748)],0,.01,'Adobe','Y')
+    elif name=='ofrenda_arch':
+        # Arco de carrizo con hojas/flores repetidas en la curva.
+        for x in (-.9,.9): beam('Poste carrizo',(x,0,0),(x,0,2.05),.09,.09,'Earth')
+        for i in range(13):
+            a=math.pi-i*math.pi/12
+            x=.9*math.cos(a); z=2.05+.48*math.sin(a)
+            beam('Carrizo',(x-.09,0,z-.08),(x+.09,0,z+.08),.07,.07,'Earth')
+            for side in (-1,1):
+                lathe('Flor',[(.015,0),(.07,.025),(.025,.05)],'Marigold',6,(x,side*.12,z),'Y')
+    elif name=='ofrenda_tier':
+        box('Basamento',(0,0,.14),(2.,1.,.28),'Adobe',.04)
+        slab('Mantel',(0,-.015,.31),(2.02,1.02,.035),'Papel_Magenta',.01)
+        for x in [i*.15-.9 for i in range(13)]: beam('Fleco',(x,-.52,.29),(x,-.52,.20),.018,.02,'Papel_Cyan')
+    elif name=='papel_picado_string':
+        tube('Cordel',[(-1,0,.42),(-.5,0,.34),(0,0,.32),(.5,0,.34),(1,0,.42)],.009,'Earth',4)
+        for i in range(5):
+            x=-.8+i*.4; col=('Papel_Magenta','Papel_Purple','Papel_Cyan')[i%3]
+            prism('Banderín',[(x-.16,-.012,.30),(x+.16,-.012,.30),(x+.13,-.012,.08),(x,-.012,.02),(x-.13,-.012,.08)],-.015,.015,col,'Y')
+            for dx in (-.07,.07): prism('Calado',[(x+dx-.025,-.018,.22),(x+dx+.025,-.018,.22),(x+dx+.02,-.018,.17),(x+dx-.02,-.018,.17)],-.003,.003,'Paper','Y')
+    elif name in ('sugar_skull','sugar_skull_giant'):
+        sx,sy,sz=SPECS[name][0]
+        # Cráneo facetado con mandíbula y cuencas oscuras/fosforescentes.
+        lathe('Cráneo',[(sx*.32,0),(sx*.47,sz*.20),(sx*.5,sz*.62),(sx*.34,sz*.88),(sx*.12,sz)],'Sugar',8)
+        box('Mandíbula',(0,0,sz*.18),(sx*.68,sy*.76,sz*.28),'Sugar_Detail',.02)
+        for x in (-sx*.17,sx*.17):
+            eye=[(x+sx*.075*math.cos(i*math.tau/8),sz*.57+sz*.12*math.sin(i*math.tau/8)) for i in range(8)]
+            prism('Cuenca fosforescente',eye,-sy*.53,-sy*.51,'Glow' if name.endswith('giant') else 'Basalt','Y')
+        for x in (-sx*.18,-sx*.06,.06,.18):
+            box('Diente',(x,-sy*.53,sz*.14),(sx*.045,.012,sz*.10),'Sugar',.004)
+        for i in range(8):
+            a=i*math.tau/8; lathe('Pétalo',[(sx*.025,0),(sx*.07,.012)],'Marigold',(6),(.0+sx*.40*math.cos(a),0,sz*.53+sz*.30*math.sin(a)),'Y')
+    elif name=='pan_de_muerto':
+        lathe('Pan',[(.075,0),(.105,.025),(.10,.075),(.055,.095)],'Sugar',8)
+        for a in (0,math.pi/2): beam('Huesito',(-.09*math.cos(a),-.09*math.sin(a),.06),(.09*math.cos(a),.09*math.sin(a),.06),.035,.035,'Sugar_Detail')
+    elif name=='copal_censer':
+        lathe('Copa',[(.055,0),(.10,.05),(.09,.15),(.05,.18)],'Ceramic',8)
+        lathe('Pie',[(.035,0),(.06,.06)],'Black_Clay',8,(0,0,.0))
+        for i in range(5): lathe('Brasa',[(.012,0),(.02,.015)],'Flame',5,((i-2)*.025,0,.20))
+        for i in range(3): beam('Asa',(.08,0,.09),(.12,0,.13+i*.01),.012,.012,'Ceramic')
+    elif name in ('marigold_vase','clay_pot_black'):
+        black=name=='clay_pot_black'; lathe('Vasija',[(.10,0),(.16,.08),(.19,.24),(.14,.35),(.08,.39),(.075,.45)],'Black_Clay' if black else 'Ceramic',8)
+        if black:
+            for i in range(6):
+                a=i*math.tau/6; lathe('Relieve floral',[(.018,0),(.04,.01)],'Stone',5,(.13*math.cos(a),.13*math.sin(a),.22))
+        else:
+            for i in range(7):
+                a=i*math.tau/7; beam('Tallo',(.02*math.cos(a),.02*math.sin(a),.42),(.12*math.cos(a),.12*math.sin(a),.5),.012,.012,'Earth')
+                lathe('Flor',[(.015,0),(.045,.025)],'Marigold',6,(.12*math.cos(a),.12*math.sin(a),.47))
+    elif name=='marigold_pile':
+        for i in range(25):
+            a=i*2.4; r=.08+(i%6)*.065; x=r*math.cos(a); y=r*math.sin(a)
+            lathe('Flor',[(.018,0),(.055,.025),(.02,.04)],'Marigold',5,(x,y,.02+(i%3)*.035))
+    elif name=='photo_frame_empty':
+        frame('Marco vacío',.18,.25,.12,.19,.035,'Oak')
+        box('Pie',(0,.015,.015),(.20,.08,.03),'Oak_Dark')
+    elif name=='adobe_rubble':
+        for i in range(8):
+            x=((i*37)%11)/11*1.05-.525; y=((i*17)%7)/7*.68-.34; z=.06+(i%3)*.15
+            box('Adobe caído',(x,y,z),(.30,.24,.14),'Adobe' if i%3 else 'Concrete',.025)
+    elif name=='stone_stele':
+        box('Losa volcánica',(0,0,.85),(.9,.35,1.7),'Basalt',.035)
+        for z in (.34,.66,1.0,1.32):
+            beam('Greca escalonada',(-.27,-.184,z),(-.08,-.184,z),.035,.018,'Stone')
+            beam('Greca escalonada',(-.27,-.184,z),(-.27,-.184,z+.14),.035,.018,'Stone')
+            beam('Greca escalonada',(.08,-.184,z),(.27,-.184,z),.035,.018,'Stone')
+            beam('Greca escalonada',(.27,-.184,z),(.27,-.184,z+.14),.035,.018,'Stone')
+    elif name=='wallpaper_peel':
+        prism('Papel desprendido',[(-.6,1.4),(-.58,.1),(-.4,.18),(-.22,0),(.05,.16),(.18,.02),(.42,.24),(.6,.08),(.6,1.4)],-.03,.03,'Paper','Y')
+        for x in (-.4,0,.4): beam('Borde rasgado',(x,.02,.2),(x+.08,.02,.02),.018,.018,'Beige_Dark')
+    elif name=='cabinet_rusty_stack':
+        for z in (.67,1.99):
+            box('Archivero',(0,0,z),(.5,.62,1.28),'Rust',.025)
+            for i in range(3):
+                zz=z-.43+i*.38; slab('Cajón',(0,-.32,zz),(.45,.025,.32),'Metal_Dark',.01)
+                box('Asa',(0,-.345,zz),(.10,.018,.025),'Iron',.006)
+        for z in (.55,1.85): slab('Cajón abierto',(0,-.39,z),(.42,.24,.035),'Rust',.01)
+        for x in (-.14,0,.14): lathe('Veladora',[(.025,0),(.025,.13)],'Sugar',6,(x,-.42,2.60))
+    elif name=='pipe_run':
+        beam('Tubo',(-1,0,0),(1,0,0),.10,.10,'Iron')
+        for x in (-.8,-.25,.3,.85):
+            lathe('Abrazadera',[(.066,0),(.066,.018)],'Rust',8,(x,0,0),'X')
+            box('Tornillo',(x,-.063,0),(.035,.02,.035),'Iron',.006)
+    elif name=='pipe_elbow_valve':
+        lathe('Tubo vertical',[(.08,0),(.08,.25)],'Iron',8,(0,0,.05))
+        beam('Codo',(0,0,.30),(.18,0,.48),.16,.16,'Iron')
+        lathe('Volante',[(.12,0),(.12,.02)],'Rust',8,(.18,-.02,.48),'Y')
+        beam('Radio',(0,-.14,.48),(.36,-.14,.48),.025,.025,'Iron')
+    elif name=='duct_grille':
+        frame('Marco boca',1.9,1.3,1.5,1.1,.04,'Iron')
+        # Rejilla abierta y abatida bajo el hueco.
+        for i in range(7): beam('Barrote',(-.65+i*.22,.05,.16),(-.65+i*.22,.05,-.52),.025,.025,'Metal_Grey')
+        beam('Bisagra',(-.75,0,.12),(.75,0,.12),.04,.04,'Rust')
+    elif name=='ledge_walkway':
+        box('Marco pasarela',(0,0,.06),(2.,.6,.10),'Iron',.02)
+        for x in [i*.14-.91 for i in range(14)]: box('Rejilla',(x,0,.125),(.018,.56,.025),'Metal_Grey')
+        for y in (-.27,.27): beam('Borde',( -1,y,.17),(1,y,.17),.025,.025,'Iron')
+    elif name=='marigold_raft':
+        for i in range(18):
+            a=i*2.4; r=.08+(i%4)*.07
+            lathe('Flor',[(.012,0),(.045,.025)],'Marigold',5,(r*math.cos(a),r*math.sin(a),.02))
+    elif name=='wallet_open':
+        slab('Cartera',(0,0,.008),(.2,.1,.016),'Oak_Dark',.01)
+        slab('Solapa',(0,.045,.018),(.2,.045,.012),'Oak',.01)
+        for x in (-.06,0,.06): box('Tarjeta',(x,-.02,.018),(.035,.05,.008),'Paper',.002)
+    elif name in ('clay_wall_panel','clay_wall_broken'):
+        broken=name.endswith('broken'); frame('Losa',2.,2.7,1.0 if broken else 1.65,2.0 if broken else 2.35,.25,'Black_Clay',1.35)
+        # Relieves tallados rodean el hueco central.
+        for z in (.32,.70,1.05,1.65,2.,2.35):
+            for x in (-.82,.82):
+                lathe('Flor tallada',[(.035,0),(.11,.025)],'Stone',6,(x,-.16,z),'Y')
+                box('Greca',(x,-.17,z+.13),(.16,.025,.035),'Basalt')
+    elif name=='drain_grate':
+        frame('Borde desagüe',.8,.8,.7,.7,.04,'Iron')
+        for i in range(7): box('Ranura',(i*.095-.285,0,.025),(.025,.68,.018),'Metal_Grey')
+    elif name in ('oak_door_monumental','oak_door_open'):
+        open_door=name.endswith('open'); depth=1.3 if open_door else .5
+        for x in (-1.24,1.24): box('Jamba',(x,0,1.9),(.12,depth,3.8),'Oak_Dark',.025)
+        box('Dintel',(0,0,3.72),(2.6,depth,.16),'Oak_Dark',.025)
+        for x in (-.61,.61):
+            angle=(-.65 if x<0 else .65) if open_door else 0
+            for z in (.95,2.85):
+                # hojas talladas con nervaduras, conservando bisagra al marco
+                leaf=box('Hoja',(x,angle,1.9),(1.18,.12,3.55),'Oak',.025)
+            for z in (.48,1.12,1.9,2.68,3.32):
+                for y in (-.07,.07): box('Clavo',(x,y,z),(.035,.018,.035),'Iron',.008)
+        for x in (-1.17,1.17):
+            for z in (.4,1.9,3.4): box('Bisagra',(x,-.09,z),(.08,.04,.32),'Iron',.01)
+    elif name=='neon_noho_sign':
+        box('Bastidor',(0,0,.4),(2.8,.08,.8),'Iron',.035)
+        for i,ch in enumerate('NOHO'):
+            x=-1.04+i*.69
+            if ch=='O':
+                # marco octagonal hueco luminoso
+                for a in range(8):
+                    t=a*math.tau/8; u=(a+1)*math.tau/8
+                    beam('Neón',(x+.22*math.cos(t),-.06,.4+.32*math.sin(t)),(x+.22*math.cos(u),-.06,.4+.32*math.sin(u)),.045,.045,'Glow')
+            elif ch=='N':
+                for a,b in (((x-.24,.1),(x-.24,.7)),((x+.24,.1),(x+.24,.7)),((x-.24,.1),(x+.24,.7))): beam('Neón',(a[0],-.06,a[1]),(b[0],-.06,b[1]),.045,.045,'Glow')
+            else:
+                for xx in (x-.22,x+.22): beam('Neón',(xx,-.06,.1),(xx,-.06,.7),.045,.045,'Glow')
+                beam('Neón',(x-.22,-.06,.4),(x+.22,-.06,.4),.045,.045,'Glow')
+    elif name=='papel_picado_bridge':
+        for x in (-.9,-.45,0,.45,.9):
+            prism('Tira',[ (x-.10,-1.),(x+.10,-1.),(x+.10,1.),(x-.10,1.)],-.03,.03,('Papel_Magenta','Papel_Purple','Papel_Cyan')[int((x+1)*2)%3])
+            for y in (-.85,.85): prism('Fleco',[(x-.1,y),(x+.1,y),(x+.06,y-.12),(x,y-.18),(x-.06,y-.12)],-.035,.035,'Papel_Cyan')
+        for x in (-1,1): tube('Tensor',[(x,-1,0),(x,0,.03),(x,1,0)],.012,'Earth',4)
+    elif name=='island_underside':
+        # La masa cuelga desde z=0 hacia abajo, origen en su cara superior.
+        for x,y,s in ((-.52,-.48,.88),(.48,-.42,.80),(-.42,.48,.78),(.52,.48,.76)):
+            outline=[]
+            for i in range(6):
+                a=i*math.tau/6+.12
+                radius=s*(.43+.07*math.sin(i*2.3+x))
+                outline.append((x+radius*math.cos(a),y+radius*math.sin(a)))
+            verts=[(px,py,-.08) for px,py in outline]
+            verts += [(px*.94+x*.06,py*.94+y*.06,-s*(.72+.16*math.sin(i*1.7))) for i,(px,py) in enumerate(outline)]
+            verts.append((x,y,-s))
+            faces=[tuple(range(5,-1,-1))]
+            for i in range(6):
+                j=(i+1)%6
+                faces.extend([(i,j,6+j,6+i),(6+i,6+j,12)])
+            mesh('Roca facetada',verts,faces,'Basalt')
+        for i in range(5): tube('Cable',[(i*.18-.36,.55,-.1),(i*.18-.36,.58,-.55-(i%3)*.2)],.012,'Iron',4)
+    elif name=='stalagmite':
+        lathe('Estalagmita',[(.34,0),(.32,.12),(.22,.55),(.16,1.1),(.08,1.55),(0,1.9)],'Basalt',6)
+    elif name=='emergency_beacon':
+        lathe('Base',[(.08,0),(.11,.04),(.09,.14)],'Iron',8)
+        lathe('Cúpula',[(.09,.13),(.10,.18),(.07,.26),(.025,.30)],'Glow',8)
+    elif name=='door_frame_lone':
+        frame('Umbral aislado',1.2,2.2,.94,1.94,.08,'Oak_Dark')
+        box('Hoja entreabierta',(.30,-.01,1.08),(.58,.08,2.08),'Oak',.018)
+        for z in (.4,1.1,1.8): box('Bisagra',(.03,-.11,z),(.07,.03,.18),'Iron',.008)
+    elif name=='petal_cairn':
+        for i in range(15):
+            a=i*2.4; r=.06+(i%4)*.045
+            lathe('Pétalo',[(.015,0),(.04,.015)],'Marigold',5,(r*math.cos(a),r*math.sin(a),.015+(i%3)*.015))
+        lathe('Veladora',[(.07,0),(.07,.20)],'Sugar',8,(.18,0,0))
+        lathe('Llama',[(.018,0),(.025,.04),(.004,.08)],'Flame',5,(.18,0,.18))
+    elif name=='badge_noho':
+        box('Cuerpo gafete',(0,0,.065),(.086,.012,.13),'Iron',.004)
+        box('Cara del gafete',(0,-.007,.065),(.074,.004,.112),'Oak',.003)
+        box('Pantalla',(0,-.010,.078),(.064,.003,.034),'Screen',.002)
+        box('Placa nombre',(0,-.010,.035),(.052,.003,.012),'Paper',.002)
+        box('Pinza',(0,0,.133),(.032,.012,.014),'Iron',.002)
+        tube('Cordón',[(0,0,.133),(0,0,.16),(.018,0,.18)],.003,'Oak',4)
+        lathe('Pétalo',[(.003,0),(.012,.01)],'Marigold',5,(.027,-.009,.08),'Y')
+
+
+NEW_MODELS=tuple(name for name in SPECS if name not in globals())
+for _name in NEW_MODELS:
+    globals()[_name]=lambda n=_name:new_model(n)
+
+
 def chair_tipped():
     chair_office()
     rotation=Matrix.Rotation(math.pi/2,3,'Y')
@@ -653,7 +891,7 @@ def sign_hanging():
 
 
 def place_origin(name):
-    if name in ('wall_clock','painting_frame','plaque','exit_sign','letter_n','door_exit')+SIGNS+CEILING_MODELS: return
+    if name in ('wall_clock','painting_frame','plaque','exit_sign','letter_n','letter_o','letter_h','door_exit','badge_noho')+SIGNS+CEILING_MODELS: return
     points=[v.co for o in bpy.context.scene.objects for v in o.data.vertices]
     offset=Vector(((min(v.x for v in points)+max(v.x for v in points))/2,
                    (min(v.y for v in points)+max(v.y for v in points))/2,min(v.z for v in points)))
@@ -683,13 +921,34 @@ def validate(name):
         print(f'BODY {name}: {tuple(round(v,4) for v in checked)} m; nominal={expected}',flush=True)
     print(f'MODEL {name}: {tris}/{budget} tris; bbox={tuple(round(v,4) for v in size)} m; materials={sorted(names)}',flush=True)
     if names-set(PALETTE): raise ValueError(f'{name}: materiales fuera de paleta')
+    if len(names)>5: raise ValueError(f'{name}: demasiados materiales ({len(names)}>5)')
     if tris>budget: raise ValueError(f'{name}: presupuesto excedido ({tris}>{budget})')
     if any(abs(a-b)/b>.15 for a,b in zip(checked,expected)):
         raise ValueError(f'{name}: dimensiones {checked}, esperadas {expected}')
     floor=min(v.z for v in points)
-    if name not in ('wall_clock','painting_frame','plaque','exit_sign','letter_n')+SIGNS+CEILING_MODELS and abs(floor)>.008:
+    if name not in ('wall_clock','painting_frame','plaque','exit_sign','letter_n','letter_o','letter_h')+SIGNS+CEILING_MODELS and abs(floor)>.008:
         raise ValueError(f'{name}: no descansa sobre el suelo ({floor})')
     return tris
+
+
+def fit_nominal_bounds(name):
+    """Ajusta los vértices al tamaño nominal sin cambiar el origen semántico."""
+    expected=SPECS[name][0]
+    points=[v.co.copy() for o in bpy.context.scene.objects for v in o.data.vertices]
+    lo=[min(p[i] for p in points) for i in range(3)]
+    hi=[max(p[i] for p in points) for i in range(3)]
+    span=[hi[i]-lo[i] for i in range(3)]
+    target_min=[-expected[i]/2 for i in range(3)]
+    if name=='badge_noho': target_min[2]=-expected[2]
+    if name not in ('wall_clock','painting_frame','plaque','exit_sign','letter_n','letter_o','letter_h','door_exit')+SIGNS+CEILING_MODELS:
+        target_min[2]=0.
+    if name in CEILING_MODELS:
+        target_min[2]=-expected[2]
+    for o in bpy.context.scene.objects:
+        for v in o.data.vertices:
+            for axis in range(3):
+                v.co[axis]=target_min[axis]+(v.co[axis]-lo[axis])*expected[axis]/span[axis]
+        o.data.update()
 
 
 def main():
@@ -701,7 +960,7 @@ def main():
     out=ROOT/'assets/models'; out.mkdir(parents=True,exist_ok=True)
     errors=[]
     for name in names:
-        clear(); BUILDERS[name](); place_origin(name)
+        clear(); BUILDERS[name](); place_origin(name); fit_nominal_bounds(name)
         try: validate(name)
         except ValueError as error:
             errors.append(str(error))

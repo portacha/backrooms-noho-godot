@@ -1,5 +1,6 @@
 """Hojas de contacto: blender -b -P tools/blender/render_sheet.py."""
 import math
+import sys
 from pathlib import Path
 import bpy
 from mathutils import Vector, Matrix
@@ -29,7 +30,8 @@ def label(name,position,rotation):
 
 def main():
     OUT.mkdir(exist_ok=True)
-    paths=sorted((ROOT/'assets/models').glob('*.glb'))
+    names=sys.argv[sys.argv.index('--')+1:] if '--' in sys.argv else []
+    paths=sorted((ROOT/'assets/models'/f'{name}.glb' for name in names)) if names else sorted((ROOT/'assets/models').glob('*.glb'))
     if not paths: raise RuntimeError('Primero construye los modelos.')
     scene=bpy.context.scene
     scene.render.engine='BLENDER_WORKBENCH'
@@ -83,7 +85,8 @@ def main():
         obj.location=direction*24
         obj.rotation_euler=rotation.to_euler()
         scene.camera=obj
-        scene.render.filepath=str(OUT/f'models_sheet_{sheet}.png')
+        prefix='models_sheet_new' if names else 'models_sheet'
+        scene.render.filepath=str(OUT/f'{prefix}_{sheet}.png')
         bpy.ops.render.render(write_still=True)
         print(f'HOJA {sheet}: {scene.render.filepath}',flush=True)
 
