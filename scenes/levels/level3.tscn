@@ -16,12 +16,12 @@ ambient_light_color = Color(0, 0, 0, 1)
 ambient_light_energy = 0.0
 tonemap_mode = 2
 glow_enabled = true
-glow_intensity = 0.7
-glow_bloom = 0.04
-glow_hdr_threshold = 0.95
+glow_intensity = 0.95
+glow_bloom = 0.12
+glow_hdr_threshold = 0.85
 fog_enabled = true
-fog_light_color = Color(0.012, 0.027, 0.03, 1)
-fog_density = 0.045
+fog_light_color = Color(0.018, 0.05, 0.058, 1)
+fog_density = 0.03
 
 [node name="Level3" type="Node3D"]
 script = ExtResource("1_level")

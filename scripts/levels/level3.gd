@@ -1,6 +1,8 @@
 extends LevelBase
 ## El Pasaje de las Calaveras: agua, refugios y cazador con presupuesto por tramo.
 
+const WATER_LEVEL: float = 0.14
+
 var altar: LetterAltar = null
 var drained: bool = false
 var hunter_started: bool = false
@@ -15,7 +17,6 @@ var _water: Node3D = null
 var _wall: Node3D = null
 var _broken: Node3D = null
 var _wall_collision: CollisionShape3D = null
-var _architecture: ShaderMaterial = null
 var _documents: Array[DocumentPickup] = []
 var _hint: Array[MeshInstance3D] = []
 var _budget_spent: bool = false
@@ -29,7 +30,7 @@ func _ready() -> void:
 	player.sprint_enabled = true
 	set_touch_button(&"flashlight_visible", true)
 	set_touch_button(&"sprint_visible", true)
-	_build_surfaces()
+	_build_water()
 	_build_wall()
 	for id: String in ["d10", "d11", "d12"]:
 		var path: String = "res://resources/documents/%s.tres" % id
@@ -39,19 +40,17 @@ func _ready() -> void:
 				document.document = document.document.duplicate() as DocumentData
 				document.document.body += "\nEn el conducto los pasos se quedan afuera. Aquí la luz no falla."
 			_documents.append(document)
-			if id != "d11":
-				_add_document_surface(id, document)
+			if id == "d10":
+				_add_paper(document)
 	if ResourceLoader.exists("res://assets/models/letter_h.glb"):
-		altar = add_letter("letter_h", "letter")
+		altar = add_letter("letter_h", "letter", 0.0)
 	else:
 		altar = LetterAltar.new()
 		add_child(altar)
 		push_warning("Modelo pendiente: letter_h")
 	altar.taken.connect(_take_letter)
-	_share_dynamic_material(altar)
 	spawn_entity("res://resources/entity/profile_level3.tres")
 	entity.state_changed.connect(_on_state_changed)
-	_share_dynamic_material(entity.model, true)
 	player.noise_made.connect(_on_noise)
 	var saved: String = spawn_at_checkpoint("start", PI)
 	_last_position = player.global_position
@@ -118,84 +117,46 @@ func _physics_process(_delta: float) -> void:
 					_budget_relocated = true
 
 
-func _build_surfaces() -> void:
-	var shader: Shader = load("res://shaders/water_surface.gdshader") as Shader
-	# Concreto y limo comparten material: la normal distingue suelo de paredes/techo.
-	var architecture: ShaderMaterial = ShaderMaterial.new()
-	architecture.shader = shader
-	architecture.set_shader_parameter("architecture", true)
-	_architecture = architecture
-	for pair: Array in [["albedo_tex", "tunnel_concrete_wet"], ["floor_tex", "tunnel_floor_silt"], ["metal_tex", "duct_metal"], ["clay_tex", "clay_black"]]:
-		var path: String = "res://assets/textures/%s.png" % pair[1]
-		if ResourceLoader.exists(path):
-			architecture.set_shader_parameter(pair[0], load(path))
-	# Una sola instancia de material para todas las superficies horneadas.
-	for node: Node in geo.find_children("*", "MeshInstance3D", true, false):
-		var instance: MeshInstance3D = node as MeshInstance3D
-		var merged: ArrayMesh = ArrayMesh.new()
-		for i: int in instance.mesh.get_surface_count():
-			var material: ShaderMaterial = instance.mesh.surface_get_material(i) as ShaderMaterial
-			if material == null:
-				continue
-			var kind: float = 0.0
-			var texture: Texture2D = material.get_shader_parameter("albedo_tex") as Texture2D
-			if texture != null:
-				if texture.resource_path.ends_with("duct_metal.png"):
-					kind = 1.0
-				elif texture.resource_path.ends_with("clay_black.png"):
-					kind = 2.0
-				elif not texture.resource_path.ends_with("tunnel_concrete_wet.png"):
-					kind = 3.0
-					architecture.set_shader_parameter("palette_tex", texture)
-			var energy: Variant = material.get_shader_parameter("unlit_energy")
-			if energy is float and energy >= 0.0:
-				kind = 4.0
-			var arrays: Array = instance.mesh.surface_get_arrays(i)
-			_encode_surface(arrays, kind)
-			merged.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-		instance.mesh = merged
-		instance.material_override = architecture
-	var water_material: ShaderMaterial = ShaderMaterial.new()
-	water_material.shader = shader
-	if ResourceLoader.exists("res://assets/textures/water_marigold.png"):
-		water_material.set_shader_parameter("albedo_tex", load("res://assets/textures/water_marigold.png"))
-	_water = Node3D.new()
-	_water.name = "Agua"
-	add_child(_water)
-	_water.position.y = 0.14
-	# Rectángulos por fila: no hay planos atravesando los refugios secos.
-	var cells: Array[Vector2i] = zone_cells("water")
-	var remaining: Dictionary[Vector2i, bool] = {}
-	for cell: Vector2i in cells:
-		remaining[cell] = true
-	for cell: Vector2i in cells:
-		if not remaining.has(cell):
+## Agua: una malla a ras de 0,14 m sobre las celdas inundadas. Como no pasa por el horneado, su
+## "reflejo" se calcula aquí por vértice con las mismas luces que horneó el constructor.
+func _build_water() -> void:
+	var material: ShaderMaterial = ShaderMaterial.new()
+	material.shader = load("res://shaders/water_surface.gdshader") as Shader
+	material.set_shader_parameter("petals_tex", load("res://assets/textures/water_marigold.png"))
+	var lights: Array = geo.get_meta("lights", [])
+	var size: float = geo.get_meta("cell_size")
+	var tool: SurfaceTool = SurfaceTool.new()
+	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for cell: Vector2i in zone_cells("water"):
+		var corners: Array[Vector3] = []
+		for offset: Vector2 in [Vector2(0, 0), Vector2(1, 0), Vector2(1, 1), Vector2(0, 1)]:
+			corners.append(Vector3((cell.x + offset.x) * size, 0.0, (cell.y + offset.y) * size))
+		for index: int in [0, 1, 2, 0, 2, 3]:
+			tool.set_color(_water_light(corners[index], lights))
+			tool.set_normal(Vector3.UP)
+			tool.add_vertex(corners[index])
+	var surface: MeshInstance3D = MeshInstance3D.new()
+	surface.name = "Agua"
+	surface.mesh = tool.commit()
+	surface.material_override = material
+	surface.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(surface)
+	surface.global_position = geo.global_position + Vector3(0.0, WATER_LEVEL, 0.0)
+	_water = surface
+
+
+## Luz que llega a un punto del agua (sin oclusión: el túnel ya separa unas luces de otras).
+func _water_light(at: Vector3, lights: Array) -> Color:
+	var total: Color = Color(0, 0, 0)
+	for light: Dictionary in lights:
+		var position_light: Vector3 = light["pos"]
+		var radius: float = light["radius"]
+		var distance: float = position_light.distance_to(at)
+		if distance >= radius:
 			continue
-		var width: int = 1
-		while remaining.has(cell + Vector2i(width, 0)):
-			width += 1
-		var depth: int = 1
-		var extend: bool = true
-		while extend:
-			for x: int in width:
-				if not remaining.has(cell + Vector2i(x, depth)):
-					extend = false
-					break
-			if extend:
-				depth += 1
-		for y: int in depth:
-			for x: int in width:
-				remaining.erase(cell + Vector2i(x, y))
-		var quad: QuadMesh = QuadMesh.new()
-		quad.size = Vector2(width * 2.0, depth * 2.0)
-		var surface: MeshInstance3D = MeshInstance3D.new()
-		surface.mesh = quad
-		surface.material_override = water_material
-		surface.rotation.x = -PI * 0.5
-		surface.position = cell_center(cell) + Vector3(width - 1, 0, depth - 1)
-		surface.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		surface.visibility_range_end = 100.0
-		_water.add_child(surface)
+		var falloff: float = 1.0 - distance / radius
+		total += (light["color"] as Color) * float(light["energy"]) * falloff * falloff
+	return total
 
 
 ## Carga opcional de modelos ajenos, sin preload ni sustitutos primitivos.
@@ -203,20 +164,18 @@ func _optional_model(model: String, parent: Node3D) -> Node3D:
 	if not ResourceLoader.exists("res://assets/models/%s.glb" % model):
 		push_warning("Modelo pendiente: " + model)
 		return Node3D.new()
-	var instance: Node3D = spawn_model(model, parent, 0.12, 0.65)
-	_share_dynamic_material(instance)
-	return instance
+	return spawn_model(model, parent, 0.05, 0.9)
 
 
 func _build_wall() -> void:
 	_wall = Node3D.new()
 	add_child(_wall)
-	_wall.position = marker("wall")
+	_wall.position = marker("wall") + Vector3(0.0, 1.35, 0.0)
 	_wall.rotation.y = PI
 	_optional_model("clay_wall_panel", _wall)
 	_broken = Node3D.new()
 	add_child(_broken)
-	_broken.position = marker("wall")
+	_broken.position = marker("wall") + Vector3(0.0, 1.35, 0.0)
 	_broken.rotation.y = PI
 	_optional_model("clay_wall_broken", _broken)
 	_broken.hide()
@@ -226,7 +185,6 @@ func _build_wall() -> void:
 	var shape: BoxShape3D = BoxShape3D.new()
 	shape.size = Vector3(2, 2.7, 0.3)
 	_wall_collision.shape = shape
-	_wall_collision.position.y = 1.35
 	body.add_child(_wall_collision)
 
 
@@ -298,7 +256,7 @@ func _open_wall() -> void:
 	player.in_water = false
 	drained = true
 	var tween: Tween = create_tween()
-	tween.tween_property(_water, "position:y", -0.22, 2.0)
+	tween.tween_property(_water, "position:y", -0.3, 2.6)
 	tween.tween_callback(_water.hide)
 
 
@@ -352,59 +310,17 @@ func _show_refuge_hint() -> void:
 			petals.hide())
 
 
-## Hoja mojada y etiqueta: superficies planas, sin utilería primitiva.
-func _add_document_surface(id: String, document: DocumentPickup) -> void:
+## La carta mojada de D10: una hoja (superficie plana) sobre el escritorio hundido.
+func _add_paper(document: DocumentPickup) -> void:
 	var quad: QuadMesh = QuadMesh.new()
 	quad.size = Vector2(0.22, 0.3)
+	var material: StandardMaterial3D = StandardMaterial3D.new()
+	material.albedo_color = Color(0.62, 0.58, 0.44)
+	material.emission_enabled = true
+	material.emission = Color(0.62, 0.58, 0.44)
+	material.emission_energy_multiplier = 0.25
 	var paper: MeshInstance3D = MeshInstance3D.new()
 	paper.mesh = quad
-	var arrays: Array = quad.get_mesh_arrays()
-	var colors: PackedColorArray = PackedColorArray()
-	colors.resize((arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).size())
-	colors.fill(Color(0.52, 0.49, 0.35))
-	arrays[Mesh.ARRAY_COLOR] = colors
-	_encode_surface(arrays, 5.0)
-	var mesh: ArrayMesh = ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	paper.mesh = mesh
-	paper.material_override = _architecture
+	paper.material_override = material
+	paper.rotation = Vector3(-PI * 0.5, 0.4, 0.0)
 	document.add_child(paper)
-	if id == "d10":
-		paper.rotation.x = -PI * 0.5
-	else:
-		paper.rotation.y = PI * 0.5
-
-
-## Selector en UV2; mantiene colores horneados, pesos de skin y todas las colisiones.
-func _encode_surface(arrays: Array, kind: float) -> void:
-	var uv2: PackedVector2Array = PackedVector2Array()
-	uv2.resize((arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).size())
-	uv2.fill(Vector2(kind, 0))
-	arrays[Mesh.ARRAY_TEX_UV2] = uv2
-
-
-func _share_dynamic_material(root: Node3D, entity_body: bool = false) -> void:
-	for node: Node in root.find_children("*", "MeshInstance3D", true, false):
-		var instance: MeshInstance3D = node as MeshInstance3D
-		# El halo aditivo de la letra conserva su material de efecto.
-		if instance.mesh is QuadMesh:
-			continue
-		var merged: ArrayMesh = ArrayMesh.new()
-		for i: int in instance.mesh.get_surface_count():
-			var arrays: Array = instance.mesh.surface_get_arrays(i)
-			var kind: float = 7.0 if entity_body else 5.0
-			if not entity_body:
-				var source: StandardMaterial3D = instance.get_active_material(i) as StandardMaterial3D
-				var color: Color = Color(0.2, 0.2, 0.2)
-				if source != null:
-					color = source.emission
-					if source.emission_energy_multiplier > 0.4:
-						kind = 6.0
-				var colors: PackedColorArray = PackedColorArray()
-				colors.resize((arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).size())
-				colors.fill(color)
-				arrays[Mesh.ARRAY_COLOR] = colors
-			_encode_surface(arrays, kind)
-			merged.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-		instance.mesh = merged
-		instance.material_override = _architecture
