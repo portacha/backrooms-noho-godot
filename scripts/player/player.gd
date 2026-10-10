@@ -92,6 +92,8 @@ const STILL_SPEED: float = 0.3
 @export var breath_fade_out_db: float = 12.0
 
 var stamina: float = 100.0
+## Escala del consumo al correr; la carrera final la ajusta a su duración (docs/12 §8.4).
+var stamina_drain_scale: float = 1.0
 var is_sprinting: bool = false
 var is_hyperventilating: bool = false
 ## Agachado por el entorno (conductos, ofrendas): sin botón, sin sprint.
@@ -320,7 +322,7 @@ func _update_stamina(moving: bool, delta: float) -> void:
 		_sprint_time += delta
 		# Gracia inicial sin consumo: los toques cortos no castigan.
 		if _sprint_time > sprint_grace_seconds:
-			stamina = maxf(stamina - sprint_drain * delta, 0.0)
+			stamina = maxf(stamina - sprint_drain * stamina_drain_scale * delta, 0.0)
 	else:
 		_sprint_time = 0.0
 		var regen: float = regen_walking if moving else regen_idle

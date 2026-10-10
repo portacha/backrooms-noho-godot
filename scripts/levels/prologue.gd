@@ -98,6 +98,7 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	super(delta)
 	if _falling:
 		return
 	_update_idle_hint(delta)
@@ -396,7 +397,7 @@ func _fall() -> void:
 	tween.tween_property(player, "global_position", landing, 1.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tween.tween_property(screen_fx, "fade", 1.0, 1.0).set_delay(0.7)
 	tween.chain().tween_interval(1.3)
-	tween.chain().tween_callback(func() -> void: Game.goto_scene(Game.LEVEL_1_SCENE, LIMINAL_YELLOW))
+	tween.chain().tween_callback(func() -> void: Game.next_level(LIMINAL_YELLOW))
 
 
 ## Balanceo lento de ±6° y cabeza que se vence hacia delante.

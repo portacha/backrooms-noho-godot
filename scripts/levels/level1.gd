@@ -6,7 +6,6 @@ const HUM: AudioStream = preload("res://assets/audio/ambient/fluorescent_hum_loo
 const CANDLES: AudioStream = preload("res://assets/audio/ambient/candles_loop.ogg")
 const SWELL: AudioStream = preload("res://assets/audio/sfx/letter_swell.ogg")
 const KNOCK: AudioStream = preload("res://assets/audio/sfx/distant_knock.wav")
-const PETALS_TEXTURE: Texture2D = preload("res://assets/textures/petals.png")
 const FAR_STEPS: Array[AudioStream] = [
 	preload("res://assets/audio/sfx/footstep_far_01.wav"),
 	preload("res://assets/audio/sfx/footstep_far_02.wav"),
@@ -65,6 +64,7 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	super(delta)
 	_time += delta
 	if _letter_taken:
 		return
@@ -289,8 +289,6 @@ func _take_letter() -> void:
 	tween.tween_property(screen_fx, "aberration", 0.15, 1.5).set_delay(1.4)
 	tween.chain().tween_callback(func() -> void: player.controls_enabled = true)
 	tween.chain().tween_interval(6.0)
-	tween.chain().tween_callback(func() -> void: screen_fx.fade_color = Color.BLACK)
-	tween.chain().tween_property(screen_fx, "fade", 1.0, 2.0)
 	tween.chain().tween_callback(_finish)
 
 
@@ -311,7 +309,7 @@ func _shake(strength: float) -> void:
 	player.camera.v_offset = randf_range(-1.0, 1.0) * 0.05 * strength
 
 
+## La N abre el paso: sin corte ni tarjeta, el laberinto se expande (docs/12 §9).
 func _finish() -> void:
-	player.set_cutscene(true)
 	_candles.stop()
-	hud.show_end_card("N", "Has recuperado la primera letra.\nAlgo se acuerda de ti.\n\nContinuará — Nivel 2: Las Ofrendas Infinitas")
+	finish_level()

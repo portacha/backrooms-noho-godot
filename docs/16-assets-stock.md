@@ -261,3 +261,11 @@ Base `https://api.meshy.ai`, cabecera `Authorization: Bearer $MESHYAI`. Todas la
 - Sin luz propia: la entidad se ve por la linterna y como silueta contra la niebla (`docs/05`, regla dura 4).
 - Peso: cada `.glb` generado ≤ 3 MB (presupuesto total < 100 MB, regla dura 8).
 - Canon: diseño **original** (`docs/01`, `docs/05`); nada que recuerde a entidades de las wikis de Backrooms.
+
+### Comunidad de Meshy (sin créditos)
+
+Antes de generar, **buscar en la sección Community de meshy.ai**: modelos ya hechos por otros usuarios, descargables sin gastar créditos; sirven sobre todo para piezas orgánicas o esculpidas (calaveras, flores, cerámica, roca, criaturas como referencia de silueta). Reglas:
+
+- Comprobar la **licencia que muestra cada modelo** antes de descargarlo. Solo CC0 o CC BY (regla dura 8); CC BY exige atribución en `assets/CREDITS.md` (autor, URL, licencia). Si la página no deja clara la licencia, no se usa.
+- Es stock: pasa por staging (`builds/asset_staging/meshy_community/<nombre>/` con URL, autor, licencia y hash), adaptación a low-poly de color plano o textura ≤ 1024 px, y registro, igual que el resto de este documento.
+- Nunca copiar un personaje ajeno para El Olvidado (canon original, `docs/01`): la comunidad vale como utilería y como referencia.

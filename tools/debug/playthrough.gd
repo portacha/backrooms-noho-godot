@@ -159,9 +159,9 @@ func _run() -> void:
 	await _snap("14_taken")
 	await _wait(3.0)
 	await _snap("15_contamination")
-	await _wait(8.2)
-	await _snap("16_end_card")
-	_check(hud.get_node("EndCard").visible, "tarjeta final visible")
-	hud.get_node("EndCard/Lines/MenuButton").pressed.emit()
-	await _wait(0.6)
-	_check(_level().scene_file_path == Game.MENU_SCENE, "vuelve al menú")
+	await _wait(9.5)
+	await _snap("16_after_n")
+	var after: String = _level().scene_file_path
+	var expected: String = Game.LEVEL_2_SCENE if ResourceLoader.exists(Game.LEVEL_2_SCENE) else Game.MENU_SCENE
+	_check(after == expected, "tras la N se pasa a la escena siguiente (%s)" % after.get_file())
+	Game.finish_game()
