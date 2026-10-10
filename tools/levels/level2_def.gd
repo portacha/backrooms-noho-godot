@@ -23,6 +23,8 @@ func _init() -> void:
 	visibility_range = 70.0
 	ambient = Color(0.026, 0.022, 0.02)
 	bounce = 0.3
+	ao_strength = 2.4
+	contact_strength = 0.6
 	dual_reality = true
 	flicker_color = Color(1.0, 0.93, 0.7)
 	var wallpaper: String = "res://assets/textures/backrooms_wallpaper.png"
@@ -164,7 +166,7 @@ func _offering(rng: RandomNumberGenerator, index: int, centre: Vector3, yaw: flo
 ## Pirámide de tres niveles de archiveros oxidados. Apagada hasta que arden las tres ofrendas.
 func _pyramid(rng: RandomNumberGenerator) -> void:
 	var centre: Vector3 = cell(PYRAMID.x, PYRAMID.y)
-	var rust: Dictionary = {"Metal_Grey": Color(0.33, 0.25, 0.2), "Metal_Dark": Color(0.16, 0.11, 0.09)}
+	var rust: Dictionary = {"Metal_Grey": Color(0.2, 0.19, 0.2), "Metal_Dark": Color(0.08, 0.075, 0.08)}
 	for level: int in 3:
 		var half: float = 1.9 - level * 0.62
 		var count: int = 7 - level * 2
@@ -172,9 +174,36 @@ func _pyramid(rng: RandomNumberGenerator) -> void:
 			var basis: Basis = Basis(Vector3.UP, side * PI * 0.5)
 			for i: int in count:
 				var along: float = lerpf(-half + 0.3, half - 0.3, float(i) / maxf(count - 1, 1.0)) if count > 1 else 0.0
-				props.append({"model": "filing_cabinet", "pos": centre + basis * Vector3(along, level * 1.32, half), "rot_y": side * 90.0 + rng.randf_range(-4.0, 4.0),
+				props.append({"model": "filing_cabinet", "pos": centre + basis * Vector3(along, level * 1.32, half), "rot_y": side * 90.0 + rng.randf_range(-3.0, 3.0), "scale": 1.0,
 					"collide": level == 0, "occlude": false, "tints": rust})
-	props.append({"model": "cabinet_rusty_stack", "pos": centre + Vector3(0, 1.32, 0), "rot_y": 12.0, "collide": false})
+	# Cada repisa de la pirámide es altar: veladoras, calaveritas, flores, retratos sin foto y un
+	# paño rojo colgando al frente de cada cara (superficie plana).
+	for level: int in 3:
+		var inner: float = 1.28 - level * 0.62
+		var ledge: float = 1.62 - level * 0.62
+		var top: float = (level + 1) * 1.32
+		for side: int in 4:
+			var basis: Basis = Basis(Vector3.UP, side * PI * 0.5)
+			var yaw: float = side * 90.0
+			boxes.append({"pos": centre + basis * Vector3(0, top - 0.55, ledge + 0.335), "size": Vector3(0.95, 1.1, 0.02) if side % 2 == 0 else Vector3(0.02, 1.1, 0.95),
+				"material": &"flat", "tint": Color(0.5, 0.1, 0.09), "collide": false})
+			if level == 2:
+				continue
+			for i: int in 5:
+				var along: float = lerpf(-inner, inner, i / 4.0)
+				var kind: int = (i + side + level) % 5
+				var spot: Vector3 = centre + basis * Vector3(along + rng.randf_range(-0.08, 0.08), top, ledge + rng.randf_range(-0.1, 0.1))
+				match kind:
+					0:
+						props.append({"model": "sugar_skull", "pos": spot, "rot_y": yaw + rng.randf_range(-25.0, 25.0), "scale": 1.4, "collide": false})
+					1:
+						props.append({"model": "photo_frame_empty", "pos": spot, "rot_y": yaw + 180.0, "scale": 1.3, "collide": false})
+					2:
+						props.append({"model": "marigold_pile", "pos": spot, "scale": 0.45, "rot_y": rng.randf_range(0.0, 360.0), "collide": false})
+					_:
+						props.append({"model": ["candle_mid", "candle_tall"][rng.randi() % 2], "pos": spot, "scale": rng.randf_range(1.3, 1.9), "collide": false})
+			lights.append({"pos": centre + basis * Vector3(0, top + 0.5, ledge + 0.5), "color": WARM, "energy": 0.55, "radius": 4.5})
+	props.append({"model": "copal_censer", "pos": centre + Vector3(0, 3.96, 0), "scale": 1.6, "collide": false})
 	for i: int in 30:
 		var angle: float = rng.randf_range(0.0, TAU)
 		var radius: float = rng.randf_range(2.5, 3.6)
@@ -187,7 +216,7 @@ func _pyramid(rng: RandomNumberGenerator) -> void:
 		lights.append({"pos": centre + out, "color": WARM, "energy": 0.8, "radius": 7.0})
 	lights.append({"pos": centre + Vector3(0, 5.6, 0), "color": Color(1.0, 0.3, 0.6), "energy": 0.35, "radius": 9.0})
 	markers["pyramid"] = centre
-	markers["letter"] = centre + Vector3(0, 5.0, 0)
+	markers["letter"] = centre + Vector3(0, 5.25, 0)
 	# D09: servilleta en el primer peldaño, del lado por el que se llega desde la tercera ofrenda.
 	boxes.append({"pos": centre + Vector3(0.9, 1.326, 2.0), "size": Vector3(0.16, 0.012, 0.16), "material": &"flat", "tint": Color(0.9, 0.88, 0.8), "collide": false, "rot_y": 18.0})
 	markers["d09"] = centre + Vector3(0.9, 1.36, 2.0)

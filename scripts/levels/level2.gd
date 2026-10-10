@@ -12,8 +12,7 @@ const OFFERINGS: int = 3
 ## Segundos de "realidad" tras encender cada ofrenda antes de que la mente vuelva a tapar la nave.
 const REAL_SECONDS: float = 26.0
 const MANIFEST_SECONDS: float = 25.0
-const FOG_BACKROOMS: Color = Color(0.05, 0.045, 0.02)
-const FOG_REAL: Color = Color(0.075, 0.052, 0.036)
+const LETTER_SIZE: float = 2.6
 
 var altar: LetterAltar = null
 var lit_count: int = 0
@@ -30,18 +29,18 @@ var _random_pending: bool = false
 var _random_in: float = 0.0
 var _taken: bool = false
 var _finishing: bool = false
-var _environment: Environment = null
 
 
 func _ready() -> void:
 	super()
-	_environment = ($WorldEnvironment as WorldEnvironment).environment
 	player.flashlight.available = true
 	player.flashlight.turn(true)
 	player.sprint_enabled = true
 	player.camera.far = 120.0
 	set_touch_button(&"flashlight_visible", true)
 	set_touch_button(&"sprint_visible", true)
+	fog_real_color = Color(0.078, 0.054, 0.036)
+	fog_real_density = 0.03
 	set_reality(0.0)
 
 	_build_documents()
@@ -187,9 +186,11 @@ func _wake_pyramid(restoring: bool) -> void:
 		create_tween().tween_callback(_set_flame.bind(_pyramid_candles[i], 3.0)).set_delay(0.0 if restoring else 1.0 + i * 0.18)
 	altar = add_letter("letter_o", "letter", 0.0, 6.2)
 	altar.taken.connect(_take_letter)
+	altar.size = LETTER_SIZE
+	altar.set_neon(Color(1.0, 0.34, 0.26), 1.5)
 	if not restoring:
-		altar.scale = Vector3.ZERO
-		create_tween().tween_property(altar, "scale", Vector3.ONE, 1.6).set_delay(2.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		altar.size = 0.0
+		create_tween().tween_property(altar, "size", LETTER_SIZE, 1.6).set_delay(2.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		hud.show_line("Ahí está. Arriba de todo.", 3.5)
 	pyramid_awake.emit()
 
@@ -285,14 +286,6 @@ func _update_reality(delta: float) -> void:
 			else:
 				blackout_reality(0.0)
 				hud.show_line("…la oficina. Solo es la oficina.", 3.0)
-
-
-func _on_reality_changed() -> void:
-	if _environment == null:
-		return
-	# La niebla también tiene dos caras: polvo de oficina o humo de copal.
-	_environment.fog_light_color = FOG_BACKROOMS.lerp(FOG_REAL, reality)
-	_environment.fog_density = lerpf(0.012, 0.024, reality)
 
 
 ## Brillo de la llama (y del cuerpo de cera) de una veladora dinámica.

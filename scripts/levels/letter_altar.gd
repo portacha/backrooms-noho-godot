@@ -10,6 +10,8 @@ const NEON: Color = Color(1.0, 0.36, 0.72)
 var hold_ratio: float = 0.0
 var is_taken: bool = false
 var spot: Interactable = null
+## Escala de la letra (la O del Nivel 2 es monumental).
+var size: float = 1.0
 
 var _base_y: float = 0.0
 var _time: float = 0.0
@@ -56,6 +58,20 @@ func build(level: LevelBase, model: String, yaw: float, interaction_range: float
 			hold_ratio = ratio)
 
 
+## Color y energía del tubo de neón (por defecto, rosa pálido).
+func set_neon(color: Color, energy: float) -> void:
+	for node: Node in find_children("*", "MeshInstance3D", true, false):
+		var mesh_instance: MeshInstance3D = node as MeshInstance3D
+		if mesh_instance.mesh is QuadMesh:
+			(mesh_instance.material_override as StandardMaterial3D).albedo_color = Color(color.r, color.g, color.b, 0.3)
+			continue
+		for surface: int in mesh_instance.mesh.get_surface_count():
+			var material: StandardMaterial3D = mesh_instance.get_surface_override_material(surface) as StandardMaterial3D
+			if material != null:
+				material.emission = color
+				material.emission_energy_multiplier = energy
+
+
 func _process(delta: float) -> void:
 	if is_taken:
 		return
@@ -63,7 +79,7 @@ func _process(delta: float) -> void:
 	position.y = _base_y + sin(_time * 1.3) * 0.035
 	rotation.y = sin(_time * 0.5) * 0.35
 	var grow: float = 1.0 + hold_ratio * 0.25
-	scale = Vector3(grow, grow, grow)
+	scale = Vector3.ONE * grow * size
 
 
 func _on_interacted() -> void:

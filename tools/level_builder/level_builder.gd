@@ -36,6 +36,9 @@ var _lights: Array[Dictionary] = []
 var _samples: Array[PackedVector3Array] = []
 var _buckets: Dictionary[Vector2i, Array] = {}
 var _occluders: Array[AABB] = []
+var _hero_props: Array[Dictionary] = []
+## Huellas de objetos apoyados en el suelo, por celda: dan la sombra de contacto del horneado.
+var _contacts: Dictionary[Vector2i, Array] = {}
 var _panels: Array[SurfaceData] = []
 var _floor_sum: PackedColorArray = PackedColorArray()
 var _floor_count: PackedInt32Array = PackedInt32Array()
@@ -132,6 +135,8 @@ func _build(def: LevelDef) -> Node3D:
 		_emit_panels()
 	_navigation_meta()
 	_root.set_meta("lights", _lights)
+	_root.set_meta("hero_props", _hero_props)
+	_root.set_meta("flicker_color", def.flicker_color)
 	_root.set_meta("cell_size", def.cell_size)
 	_root.set_meta("rows", def.rows)
 	_root.set_meta("build_stats", {"cells": _grid.size(), "vertices": vertex_count, "lights": _lights.size()})
@@ -576,7 +581,12 @@ func _bake() -> void:
 			var value: Color = data.colors[i] + ambient
 			if cell >= 0:
 				value += averages[cell] * _def.bounce * (2.0 if data.kinds[i] == 1 else 1.0)
-			value *= _ao(data.positions[i], data.normals[i], cell, data.kinds[i]) * 0.5
+			var occlusion: float = _ao(data.positions[i], data.normals[i], cell, data.kinds[i])
+			var contact: float = _contact_shadow(data.positions[i]) if data.kinds[i] == 0 else 1.0
+			# La oclusión pesa más en la luz real (rgb) que en los tubos de backrooms (alfa):
+			# la oficina es plana y sin sombra; lo que hay debajo, no.
+			var deep: float = pow(occlusion, _def.ao_strength) * contact
+			value = Color(value.r * deep, value.g * deep, value.b * deep, value.a * occlusion * lerpf(1.0, contact, 0.4)) * 0.5
 			data.colors[i] = Color(clampf(value.r, 0, 1), clampf(value.g, 0, 1), clampf(value.b, 0, 1), clampf(value.a, 0, 1))
 
 func _ao(p: Vector3, n: Vector3, cell: int, kind: int) -> float:
@@ -600,6 +610,35 @@ func _ao(p: Vector3, n: Vector3, cell: int, kind: int) -> float:
 		result *= 0.8
 	return result
 
+## Sombra de contacto: oscurece el suelo junto a la huella de los objetos apoyados en él.
+func _contact_shadow(p: Vector3) -> float:
+	var cell: Vector2i = _cell(p)
+	if not _contacts.has(cell):
+		return 1.0
+	var shade: float = 1.0
+	for box: AABB in _contacts[cell]:
+		var dx: float = maxf(maxf(box.position.x - p.x, p.x - box.end.x), 0.0)
+		var dz: float = maxf(maxf(box.position.z - p.z, p.z - box.end.z), 0.0)
+		var distance: float = sqrt(dx * dx + dz * dz)
+		if distance < _def.contact_radius:
+			shade = minf(shade, lerpf(1.0 - _def.contact_strength, 1.0, distance / _def.contact_radius))
+	return shade
+
+
+func _add_contact(box: AABB) -> void:
+	if box.position.y > 0.25 or box.size.y < 0.12:
+		return
+	var grown: AABB = box.grow(_def.contact_radius)
+	var from: Vector2i = _cell(grown.position)
+	var to: Vector2i = _cell(grown.end)
+	for z: int in range(from.y, to.y + 1):
+		for x: int in range(from.x, to.x + 1):
+			var key: Vector2i = Vector2i(x, z)
+			if not _contacts.has(key):
+				_contacts[key] = []
+			_contacts[key].append(box)
+
+
 ## Superficies de los modelos con tratamiento emisivo: nombre del material en Blender → material del nivel.
 const SPECIAL_MATERIALS: Dictionary[String, StringName] = {"Flame": &"flame", "Glow": &"glow"}
 
@@ -620,6 +659,11 @@ func _emit_prop(prop: Dictionary) -> void:
 	if not tilt.is_zero_approx():
 		basis = basis * Basis(Vector3.RIGHT, deg_to_rad(tilt.x)) * Basis(Vector3.BACK, deg_to_rad(tilt.z))
 	var placement: Transform3D = Transform3D(basis.scaled(Vector3.ONE * scale), prop["pos"])
+	# Modelos "hero" (con textura propia, `assets/models/hero/`): no se funden en la paleta; el
+	# nivel los instancia aparte. Aquí solo dejan su colisión, su sombra y su ficha.
+	var hero: bool = _def.hero_props and ResourceLoader.exists("res://assets/models/hero/%s.glb" % prop["model"])
+	if hero:
+		_hero_props.append({"model": String(prop["model"]), "transform": placement})
 	var local_bounds: AABB = AABB()
 	var has_bounds: bool = false
 	var screen_sum: Vector3 = Vector3.ZERO
@@ -640,6 +684,12 @@ func _emit_prop(prop: Dictionary) -> void:
 			var material_name: String = material.resource_name if material != null else ""
 			var key: StringName = PALETTE_MATERIAL
 			var swatch: Vector2 = Vector2(-1.0, -1.0)
+			if hero:
+				for vertex: Vector3 in vertices:
+					var in_hero: Vector3 = local * vertex
+					local_bounds = local_bounds.expand(in_hero) if has_bounds else AABB(in_hero, Vector3.ZERO)
+					has_bounds = true
+				continue
 			var is_screen: bool = material_name == "Screen"
 			if is_screen and _def.materials.has(prop.get("screen_material", &"screen")):
 				key = prop.get("screen_material", &"screen")
@@ -690,6 +740,7 @@ func _emit_prop(prop: Dictionary) -> void:
 	var center: Vector3 = placement * local_bounds.get_center()
 	var size: Vector3 = local_bounds.size * scale
 	var world_bounds: AABB = placement * local_bounds
+	_add_contact(world_bounds)
 	if bool(prop.get("collide", true)):
 		if tilt.is_zero_approx():
 			_shape(size, center, angle)

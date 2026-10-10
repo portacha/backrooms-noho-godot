@@ -53,20 +53,20 @@ func _ready() -> void:
 				if material != null:
 					materials[material.get_instance_id()] = true
 	print("INFO materiales distintos en escena: %d" % materials.size())
-	for key: String in ["start", "cp_r1", "cp_r2", "d10", "d11", "d12", "letter", "wall", "exit", "loop_a", "loop_b"]:
+	for key: String in ["start", "cp_r1", "cp_r2", "d10", "d11", "d12", "letter", "wall", "exit", "hollow"]:
 		_check(bool(level.call("has_marker", key)), "marcador " + key)
-	_check((level.call("zone_cells", "duct") as Array).size() >= 30, "conductos cada 16 m")
-	# El dintel se debe atravesar caminando, sin teletransporte ni botón de agacharse.
-	player.respawn_at(Vector3(23, 0, 85), -PI * 0.5)
+	_check((level.call("zone_cells", "duct") as Array).size() >= 24, "huecos a oscuras repartidos por el túnel")
+	# A los huecos se entra caminando, de pie: sin dintel ni botón.
+	player.respawn_at(Vector3(21, 0, 50), PI * 0.5)
 	await _wait(0.1)
 	Input.action_press("move_forward")
-	await _wait(3.0)
+	await _wait(2.2)
 	Input.action_release("move_forward")
-	_check(player.global_position.x > 26.4 and player.is_crouched, "entrada física al conducto y agachado automático")
+	_check(bool(level.call("in_zone", player.global_position, "duct")) and not player.is_crouched, "entrada al hueco caminando, de pie")
 	for id: String in ["d10", "d11", "d12"]:
 		entity.vanish()
 		var at: Vector3 = level.call("marker", id)
-		var stand: Vector3 = Vector3(at.x, 0, at.z) + (Vector3(-0.8, 0, 0) if id == "d10" else Vector3(0, 0, -0.9))
+		var stand: Vector3 = Vector3(at.x, 0, at.z) + (Vector3(-1.0, 0, 0) if id == "d10" else Vector3(0, 0, -0.9))
 		player.respawn_at(stand, 0)
 		await _wait(0.3)
 		player.steer_look(at, 1.0)
@@ -79,9 +79,9 @@ func _ready() -> void:
 		overlay.close()
 		await _wait(0.1)
 	# Carrera sobre agua dentro del radio atrae de inmediato.
-	player.respawn_at(Vector3(39, 0, 189), PI)
+	player.respawn_at(Vector3(39, 0, 104), PI)
 	await _wait(0.2)
-	entity.teleport_to(Vector3(39, 0, 199))
+	entity.teleport_to(Vector3(39, 0, 94))
 	entity.pressure_frozen = false
 	level.set("chase_count", 0)
 	level.set("_budget_spent", false)
@@ -90,23 +90,13 @@ func _ready() -> void:
 	_check(entity.current_state() == &"Chase", "salpicadura atrae al cazador")
 	entity.pressure_frozen = true
 	player.is_sprinting = false
-	player.respawn_at(Vector3(44, 0, 189), 0)
+	player.respawn_at(Vector3(34, 0, 102), 0)
 	await _wait(0.3)
-	_check(player.is_crouched and entity.current_state() == &"Wander", "conducto termina persecución")
+	_check(entity.current_state() == &"Wander", "el hueco termina la persecución")
 	await _wait(1.0)
 	_check(player.flashlight.ratio > 0.9, "linterna estable dentro del refugio")
 	_check(not entity.profile.chase_enabled, "presupuesto agotado impide otra persecución")
 	entity.vanish()
-	# Cruce continuo: dos devoluciones entre uniones idénticas.
-	level.set("_loop_armed", true)
-	for i: int in 2:
-		player.respawn_at(Vector3(18, 0, 256.98), PI)
-		level.set("_last_position", Vector3(18, 0, 256.9))
-		Input.action_press("move_forward")
-		await _wait(0.15)
-		Input.action_release("move_forward")
-		_check(player.global_position.z < 243, "mutación de unión %d" % (i + 1))
-	_check(int(level.get("loop_count")) == 2, "máximo dos mutaciones")
 	# Checkpoints restauran posición y estado del cazador al recargar.
 	for id: String in ["r1", "r2"]:
 		Game.set_checkpoint(id)
@@ -138,9 +128,9 @@ func _ready() -> void:
 	_check(not entity.active, "entidad desvanecida")
 	Game.scene_changing.connect(func(path: String) -> void: _target = path)
 	# Cruza físicamente el boquete desde la cámara hasta el túnel.
-	player.respawn_at(Vector3(37, 0, 361), 0)
+	player.respawn_at(Vector3(37, 0, 149), 0)
 	Input.action_press("move_forward")
-	await _wait(3.1)
+	await _wait(4.8)
 	Input.action_release("move_forward")
 	await _wait(2.2)
 	_check(_target == Game.LEVEL_4_SCENE or _target == Game.MENU_SCENE, "Game.next_level tras cruzar boquete")

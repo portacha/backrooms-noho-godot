@@ -7,11 +7,9 @@ var altar: LetterAltar = null
 var drained: bool = false
 var hunter_started: bool = false
 var chase_count: int = 0
-var loop_count: int = 0
 var _segment: int = 0
 var _last_state: StringName = &"Wander"
 var _last_position: Vector3 = Vector3.ZERO
-var _loop_armed: bool = false
 var _finishing: bool = false
 var _water: Node3D = null
 var _wall: Node3D = null
@@ -32,6 +30,8 @@ func _ready() -> void:
 	player.sprint_enabled = true
 	set_touch_button(&"flashlight_visible", true)
 	set_touch_button(&"sprint_visible", true)
+	fog_real_color = Color(0.026, 0.066, 0.076)
+	fog_real_density = 0.042
 	_build_water()
 	_build_wall()
 	for id: String in ["d10", "d11", "d12"]:
@@ -40,7 +40,7 @@ func _ready() -> void:
 			var document: DocumentPickup = add_document(marker(id), path, 2.4)
 			if id == "d10":
 				document.document = document.document.duplicate() as DocumentData
-				document.document.body += "\nEn el conducto los pasos se quedan afuera. Aquí la luz no falla."
+				document.document.body += "\nMétete en los huecos oscuros. Ahí no me alcanza la vista."
 			_documents.append(document)
 			if id == "d10":
 				_add_paper(document)
@@ -87,8 +87,6 @@ func _process(delta: float) -> void:
 	if not hunter_started and player.global_position.z >= marker("hunter_gate").z:
 		hunter_started = true
 		_relocate_hunter()
-	if not drained:
-		_update_loop()
 	if drained and not _finishing and player.global_position.distance_to(marker("exit")) < 1.5:
 		_finishing = true
 		cut_all_audio()
@@ -97,16 +95,6 @@ func _process(delta: float) -> void:
 
 func _physics_process(_delta: float) -> void:
 	var at: Vector3 = player.global_position
-	# Anticipa el dintel con el borde de la cápsula, también al entrar de lado.
-	var low: bool = in_zone(at, "duct")
-	for offset: Vector3 in [Vector3(0.4, 0, 0), Vector3(-0.4, 0, 0), Vector3(0, 0, 0.4), Vector3(0, 0, -0.4)]:
-		low = low or in_zone(at + offset, "duct")
-	if low:
-		player.set_crouched(true)
-	elif player.is_crouched:
-		var query: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.create(at + Vector3.UP * 0.9, at + Vector3.UP * 1.9, 1, [player.get_rid()])
-		if player.get_world_3d().direct_space_state.intersect_ray(query).is_empty():
-			player.set_crouched(false)
 	player.in_water = not drained and in_zone(at, "water")
 	if entity != null and in_zone(at, "duct"):
 		player.flashlight.set_threat.call_deferred(INF, false)
@@ -131,11 +119,11 @@ func _physics_process(_delta: float) -> void:
 ## sobre "alfombra" que salpica— y un apagón la retira cuando llega el cazador. Entre medias,
 ## recaídas de medio segundo. En persecución no hay consuelo: todo es real.
 const REALITY_BEATS: Array[Dictionary] = [
-	{"z": 36.0, "to": 1.0, "how": "flicker"},
-	{"z": 96.0, "to": 0.0, "how": "blackout"},
-	{"z": 150.0, "to": 1.0, "how": "blackout"},
-	{"z": 246.0, "to": 0.0, "how": "flicker"},
-	{"z": 284.0, "to": 1.0, "how": "blackout"},
+	{"z": 30.0, "to": 1.0, "how": "flicker"},
+	{"z": 74.0, "to": 0.0, "how": "blackout"},
+	{"z": 95.0, "to": 1.0, "how": "blackout"},
+	{"z": 108.0, "to": 0.0, "how": "flicker"},
+	{"z": 126.0, "to": 1.0, "how": "blackout"},
 ]
 
 
@@ -258,7 +246,7 @@ func _on_state_changed(state: StringName) -> void:
 			chase_count += 1
 			_budget_spent = chase_count >= Game.difficulty.level3_chases_per_segment
 	if _last_state == &"Chase" and state == &"Wander" and in_zone(player.global_position, "duct"):
-		Game.caption("[respiración — en la boca del conducto]")
+		Game.caption("[respiración — al borde del hueco]")
 	_last_state = state
 
 
@@ -279,17 +267,6 @@ func _relocate_hunter() -> void:
 			candidate = at
 			break
 	entity.teleport_to(candidate)
-
-
-func _update_loop() -> void:
-	var at: Vector3 = player.global_position
-	if at.distance_to(marker("loop_a")) < 2.0:
-		_loop_armed = true
-	var crossed: bool = _last_position.z < marker("loop_b").z and at.z >= marker("loop_b").z and at.distance_to(_last_position) < 1.0
-	if _loop_armed and crossed and absf(at.x - marker("loop_b").x) < 1.6 and loop_count < 2:
-		loop_count += 1
-		player.global_position += marker("loop_a") - marker("loop_b")
-	_last_position = player.global_position
 
 
 func _take_letter() -> void:

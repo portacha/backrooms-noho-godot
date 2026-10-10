@@ -401,6 +401,9 @@ func _play_footstep() -> void:
 	# Sin variación de pitch: en Web (modo Sample) todo va pre-renderizado (docs/13 §9).
 	_footstep_player.stream = bank[index]
 	_footstep_player.volume_db = randf_range(-3.0, 0.0) + (2.0 if is_sprinting else 0.0)
+	# El chapoteo acompaña, no manda: va por debajo del paso seco.
+	if bank != footstep_sounds:
+		_footstep_player.volume_db -= 9.0 if is_sprinting else 12.0
 	_footstep_player.play()
 
 

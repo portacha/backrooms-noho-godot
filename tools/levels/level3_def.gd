@@ -13,6 +13,8 @@ const WARM: Color = Color(1.0, 0.5, 0.18)
 const MAGENTA: Color = Color(1.0, 0.25, 0.7)
 const TUNNEL_HEIGHT: float = 3.4
 const SKULL_STEP: int = 8
+## Tramos rectos: (columna izquierda, fila inicial, fila final).
+const SECTIONS: Array[Vector3i] = [Vector3i(3, 4, 16), Vector3i(10, 23, 41), Vector3i(18, 48, 68)]
 
 
 func _init() -> void:
@@ -23,15 +25,16 @@ func _init() -> void:
 	visibility_range = 46.0
 	ambient = Color(0.006, 0.010, 0.012)
 	bounce = 0.28
+	ao_strength = 2.6
+	contact_strength = 0.6
 	dual_reality = true
 	flicker_color = Color(1.0, 0.93, 0.7)
 	var wallpaper: String = "res://assets/textures/backrooms_wallpaper.png"
 	# Cada superficie lleva dos pieles: la real (túnel) y la de backrooms que la mente le pone.
 	materials = {
-		&"wall": {"texture": "res://assets/textures/tunnel_concrete_wet.png", "uv_scale": 3.4, "texture_gain": 1.25, "alt_texture": wallpaper, "alt_uv_scale": 1.5},
-		&"floor": {"texture": "res://assets/textures/tunnel_concrete_wet.png", "uv_scale": 3.4, "alt_texture": "res://assets/textures/backrooms_carpet.png", "alt_uv_scale": 2.0},
-		&"ceiling": {"texture": "res://assets/textures/tunnel_concrete_wet.png", "uv_scale": 3.4, "texture_gain": 0.9, "alt_texture": "res://assets/textures/backrooms_ceiling.png", "alt_uv_scale": 1.2},
-		&"metal": {"texture": "res://assets/textures/duct_metal.png", "uv_scale": 1.2},
+		&"wall": {"texture": "res://assets/textures/tunnel_concrete_wet.png", "uv_scale": 3.4, "normal_texture": "res://assets/textures/tunnel_concrete_wet_n.png", "normal_strength": 1.5, "roughness": 0.4, "specular": 0.5, "sheen": 0.18, "texture_gain": 1.25, "alt_texture": wallpaper, "alt_uv_scale": 1.5},
+		&"floor": {"texture": "res://assets/textures/tunnel_concrete_wet.png", "uv_scale": 3.4, "normal_texture": "res://assets/textures/tunnel_concrete_wet_n.png", "normal_strength": 1.2, "roughness": 0.3, "specular": 0.5, "sheen": 0.3, "alt_texture": "res://assets/textures/backrooms_carpet.png", "alt_uv_scale": 2.0},
+		&"ceiling": {"texture": "res://assets/textures/tunnel_concrete_wet.png", "uv_scale": 3.4, "normal_texture": "res://assets/textures/tunnel_concrete_wet_n.png", "normal_strength": 1.5, "roughness": 0.5, "specular": 0.4, "texture_gain": 0.9, "alt_texture": "res://assets/textures/backrooms_ceiling.png", "alt_uv_scale": 1.2},
 		&"clay": {"texture": "res://assets/textures/clay_black.png", "uv_scale": 2.6, "texture_gain": 0.75, "alt_texture": wallpaper, "alt_uv_scale": 1.5},
 		&"glow": {"tint": CYAN, "emissive": true, "energy": 2.2, "reality_side": 1.0},
 		&"flame": {"tint": Color(1.0, 0.72, 0.3), "emissive": true, "energy": 2.4},
@@ -43,55 +46,51 @@ func _init() -> void:
 		",": {"floor": &"floor", "ceiling": &"ceiling", "zone": "water", "light": tube},
 		"s": {"floor": &"floor", "ceiling": &"ceiling"},
 		"S": {"floor": &"floor", "ceiling": &"ceiling", "light": tube},
-		"d": {"floor": &"metal", "ceiling": &"metal", "wall": &"metal", "height": 1.2, "nav": false, "zone": "duct"},
+		# Hueco a oscuras: misma obra que el túnel, sin luz propia. Refugio (zona `duct` por compatibilidad).
+		"d": {"floor": &"floor", "ceiling": &"ceiling", "nav": false, "zone": "duct"},
 		"r": {"floor": &"floor", "ceiling": &"ceiling", "zone": "remanso"},
 		"w": {"floor": &"floor", "ceiling": &"ceiling", "zones": ["water", "remanso"]},
 		"c": {"floor": &"clay", "ceiling": &"clay", "wall": &"clay", "height": 4.4, "zone": "remanso"},
 		"b": {"solid": true, "wall": &"clay"},
 	}
+	# Recorrido corto (≈ 190 m) en tres tramos con dos estancias que lo rompen: la sala de
+	# válvulas y el ensanche de los archiveros. Columna = celda izquierda de un túnel de 2 celdas.
 	var grid: Array[String] = []
-	for y: int in 190:
+	for y: int in 84:
 		grid.append("#".repeat(27))
-	_carve(grid, 3, 1, 4, 35, "s")
-	_carve(grid, 3, 34, 11, 35, "s")
-	_carve(grid, 10, 34, 11, 70)
-	_carve(grid, 10, 69, 19, 70)
-	_carve(grid, 18, 69, 19, 106)
-	_carve(grid, 8, 105, 19, 106)
-	_carve(grid, 8, 105, 9, 145)
-	_carve(grid, 8, 144, 19, 145)
-	_carve(grid, 18, 144, 19, 180)
-	# Dos cruces iguales: el segundo paso devuelve al primero sin girar la cámara.
-	_carve(grid, 7, 119, 10, 120)
-	_carve(grid, 7, 127, 10, 128)
-	for section: Vector3i in [Vector3i(3, 8, 32), Vector3i(10, 42, 66), Vector3i(18, 78, 102), Vector3i(8, 112, 136), Vector3i(18, 152, 176)]:
-		for y: int in range(section.y, section.z + 1, 8):
-			_carve(grid, section.x + 2, y, section.x + 4, y, "d")
-	_carve(grid, 12, 41, 15, 43, "r")
-	_carve(grid, 12, 42, 13, 42, "d")
-	_carve(grid, 14, 42, 15, 42, "d")
-	_carve(grid, 14, 160, 17, 162, "r")
-	_carve(grid, 17, 161, 17, 161, "w")
-	# Cámara sellada al frente; abertura lateral baja accesible desde el túnel.
-	_carve(grid, 16, 178, 21, 186, "b")
-	_carve(grid, 17, 179, 20, 185, "c")
-	_carve(grid, 18, 177, 18, 179, "s")
-	_carve(grid, 20, 176, 21, 177, "d")
-	_carve(grid, 21, 178, 21, 180, "d")
-	_carve(grid, 18, 186, 18, 188, "s")
+	_carve(grid, 3, 1, 4, 20, "s")
+	_carve(grid, 3, 19, 11, 20, "s")
+	_carve(grid, 10, 21, 11, 45)
+	_carve(grid, 10, 44, 19, 45)
+	_carve(grid, 18, 44, 19, 71)
+	# Sala de válvulas: el túnel se abre y deja una repisa seca (respiro de D10).
+	_carve(grid, 8, 30, 13, 34)
+	_carve(grid, 12, 31, 13, 33, "r")
+	# Ensanche a mitad del último tramo, con su repisa (respiro de D11).
+	_carve(grid, 17, 58, 21, 62)
+	_carve(grid, 21, 59, 21, 61, "w")
+	# Huecos a oscuras, de la misma obra que el túnel: dentro, la entidad no te ve.
+	for hollow: Vector2i in [Vector2i(5, 12), Vector2i(8, 24), Vector2i(12, 39), Vector2i(16, 50), Vector2i(20, 54), Vector2i(16, 66)]:
+		_carve(grid, hollow.x, hollow.y, hollow.x + 1, hollow.y + 1, "d")
+	# Cámara de barro, sellada al frente; se entra por un pasadizo lateral a oscuras.
+	_carve(grid, 16, 72, 21, 80, "b")
+	_carve(grid, 17, 73, 20, 79, "c")
+	_carve(grid, 18, 72, 18, 72, "s")
+	_carve(grid, 20, 70, 21, 71, "d")
+	_carve(grid, 21, 72, 21, 74, "d")
 	_backrooms_remnants(grid)
 	rows = PackedStringArray(grid)
 	markers = {
 		"start": Vector3(8, 0, 4), "cp_start": Vector3(8, 0, 4),
-		"cp_r1": Vector3(23, 0, 89), "cp_r1_look": Vector3(23, 0, 93),
-		"cp_r2": Vector3(31, 0, 323), "cp_r2_look": Vector3(37, 0, 323),
-		"d10": Vector3(30, 0.55, 85), "d11": Vector3(35, 0.2, 323),
-		"d12": Vector3(36.04, 1.05, 357), "letter": Vector3(37, 1.2, 367),
-		"wall": Vector3(37, 0, 358), "exit": Vector3(37, 0, 354),
-		"hunter_gate": Vector3(23, 0, 103),
-		"loop_a": Vector3(18, 0, 241), "loop_b": Vector3(18, 0, 257),
-		"ambush_0": Vector3(39, 0, 165), "ambush_1": Vector3(19, 0, 281),
-		"ambush_2": Vector3(39, 0, 343),
+		"cp_r1": Vector3(23, 0, 73), "cp_r1_look": Vector3(23, 0, 79),
+		"cp_r2": Vector3(41, 0, 121), "cp_r2_look": Vector3(37, 0, 129),
+		"d10": Vector3(26.6, 0.8, 65), "d11": Vector3(41.6, 0.2, 119.4),
+		"d12": Vector3(36.04, 1.05, 141.4), "letter": Vector3(37, 1.2, 155),
+		"wall": Vector3(37, 0, 145), "exit": Vector3(37, 0, 140),
+		"hunter_gate": Vector3(37, 0, 95),
+		"hollow": Vector3(18, 0, 50),
+		"ambush_0": Vector3(23, 0, 55), "ambush_1": Vector3(39, 0, 111),
+		"ambush_2": Vector3(39, 0, 135),
 	}
 	_dress()
 
@@ -101,7 +100,7 @@ func _init() -> void:
 ## Fluorescentes de backrooms a media distancia entre calavera y calavera: cuando la mente
 ## vuelve a poner la oficina, alumbran ellos; en lo real están muertos.
 func _backrooms_remnants(grid: Array[String]) -> void:
-	for section: Vector3i in [Vector3i(3, 4, 32), Vector3i(10, 38, 68), Vector3i(18, 74, 104), Vector3i(8, 110, 142), Vector3i(18, 150, 174)]:
+	for section: Vector3i in SECTIONS:
 		for y: int in range(section.y + 4, section.z + 1, SKULL_STEP):
 			var symbol: String = grid[y][section.x]
 			if symbol in [".", "s"]:
@@ -112,14 +111,15 @@ func _dress() -> void:
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	rng.seed = 1142
 	var station: int = 0
-	for section: Vector3i in [Vector3i(3, 4, 32), Vector3i(10, 38, 68), Vector3i(18, 74, 104), Vector3i(8, 110, 142), Vector3i(18, 150, 174)]:
+	for section: Vector3i in SECTIONS:
 		var centre_x: float = section.x * 2.0 + 2.0
 		for y: int in range(section.y, section.z + 1, SKULL_STEP):
 			var at: Vector3 = Vector3(centre_x, TUNNEL_HEIGHT, y * 2.0 + 1.0)
 			station += 1
 			# Una de cada seis está muerta: el tramo negro donde la linterna es todo lo que hay.
 			var dead: bool = station % 6 == 4
-			props.append({"model": "sugar_skull_giant", "pos": at, "rot_y": 180.0, "collide": false,
+			# Incrustada en el techo y volcada hacia quien llega: se le ve la cara desde el pasillo.
+			props.append({"model": "sugar_skull_giant", "pos": at + Vector3(0, 0.25, 0), "rot_y": 180.0, "tilt": Vector3(-52, 0, 0), "scale": 1.35, "collide": false,
 				"tints": {} if not dead else {"Glow": Color(0.05, 0.08, 0.09)}})
 			if not dead:
 				lights.append({"pos": at - Vector3(0, 1.25, 0), "color": CYAN, "energy": 1.5, "radius": 7.5})
@@ -134,48 +134,48 @@ func _dress() -> void:
 			if y % SKULL_STEP == (section.y + 4) % SKULL_STEP:
 				props.append({"model": "pipe_elbow_valve", "pos": Vector3(section.x * 2.0 + 0.16, 2.3, y * 2.0 + 1.0), "rot_y": 90.0, "collide": false})
 
-	# Bocas de conducto: rejilla en el muro derecho y una veladora en el umbral (lo cálido = refugio).
-	for section: Vector3i in [Vector3i(3, 8, 32), Vector3i(10, 42, 66), Vector3i(18, 78, 102), Vector3i(8, 112, 136), Vector3i(18, 152, 176)]:
-		for y: int in range(section.y, section.z + 1, 8):
-			var mouth: Vector3 = Vector3((section.x + 2) * 2.0, 0.0, y * 2.0 + 1.0)
-			props.append({"model": "duct_grille", "pos": mouth + Vector3(-0.03, 0.62, 0.0), "rot_y": 90.0, "collide": false})
-			props.append({"model": "candle_short", "pos": mouth + Vector3(0.45, 0.0, 0.55), "collide": false})
-			lights.append({"pos": mouth + Vector3(0.5, 0.35, 0.3), "color": WARM, "energy": 0.55, "radius": 3.2})
-
 	# Primer tramo, seco: pasarela de rejilla y un par de manchas de flores que anuncian el agua.
-	for y: int in range(26, 35, 3):
+	for y: int in range(14, 20, 3):
 		props.append({"model": "ledge_walkway", "pos": Vector3(7.0, 0.0, y * 2.0 + 1.0), "rot_y": 90.0, "collide": false})
-	for y: int in [26, 30, 33]:
+	for y: int in [15, 17, 19]:
 		props.append({"model": "marigold_pile", "pos": Vector3(8.6, 0.0, y * 2.0), "rot_y": y * 37.0, "collide": false})
 
 	# Restos de oficina: solos, torcidos, medio hundidos (liminalidad, docs/01).
 	props.append({"model": "filing_cabinet", "pos": Vector3(7.0, 0.0, 9.0), "rot_y": 90.0})
 	props.append({"model": "chair_tipped", "pos": Vector3(9.2, 0.0, 30.0), "rot_y": 40.0, "collide": false})
-	props.append({"model": "water_cooler", "pos": Vector3(6.9, 0.0, 44.0), "rot_y": 90.0})
-	props.append({"model": "chair_office", "pos": Vector3(22.8, -0.25, 96.0), "rot_y": 200.0, "tilt": Vector3(14, 0, 8), "collide": false})
-	props.append({"model": "filing_cabinet", "pos": Vector3(39.0, -0.35, 190.0), "rot_y": -90.0, "tilt": Vector3(0, 0, 18), "collide": false})
-	props.append({"model": "desk_office", "pos": Vector3(18.6, -0.3, 262.0), "rot_y": 80.0, "tilt": Vector3(6, 0, -10), "collide": false})
-	props.append({"model": "chair_tipped", "pos": Vector3(38.4, -0.1, 318.0), "rot_y": 130.0, "collide": false})
-	for at: Vector3 in [Vector3(6.06, 1.5, 34.0), Vector3(20.06, 1.6, 120.0), Vector3(36.06, 1.6, 172.0), Vector3(16.06, 1.6, 236.0)]:
+	props.append({"model": "water_cooler", "pos": Vector3(20.7, 0.0, 52.0), "rot_y": 90.0})
+	props.append({"model": "chair_office", "pos": Vector3(22.8, -0.25, 80.0), "rot_y": 200.0, "tilt": Vector3(14, 0, 8), "collide": false})
+	for at: Vector3 in [Vector3(6.06, 1.5, 24.0), Vector3(20.06, 1.6, 56.0), Vector3(36.06, 1.6, 104.0)]:
 		props.append({"model": "wallpaper_peel", "pos": at, "rot_y": 90.0, "collide": false})
 
-	# Respiro de D10: escritorio hundido al fondo del conducto, entre veladoras.
-	props.append({"model": "desk_office", "pos": Vector3(30, -0.18, 85), "tilt": Vector3(9, 0, -8), "collide": false})
-	_candles(rng, Vector3(30, 0, 84.0), 7)
-	lights.append({"pos": Vector3(30, 0.9, 84.4), "color": WARM, "energy": 1.25, "radius": 5.5})
-	# Respiro de D11: la cartera flota junto a la repisa seca.
-	props.append({"model": "wallet_open", "pos": Vector3(35, 0.15, 323), "rot_y": 25.0, "collide": false})
-	_candles(rng, Vector3(31, 0, 322.0), 9)
-	props.append({"model": "copal_censer", "pos": Vector3(30.2, 0, 323.4), "collide": false})
-	lights.append({"pos": Vector3(31, 0.9, 322.4), "color": WARM, "energy": 1.35, "radius": 6.0})
+	# Sala de válvulas (respiro de D10): tuberías, volantes, y la repisa seca con el escritorio.
+	for z: float in [61.0, 63.0, 65.0, 67.0, 69.0]:
+		props.append({"model": "pipe_run", "pos": Vector3(16.12, 2.4, z), "rot_y": 90.0, "collide": false})
+		props.append({"model": "pipe_run", "pos": Vector3(16.12, 1.5, z), "rot_y": 90.0, "collide": false})
+	for z: float in [62.0, 66.0]:
+		props.append({"model": "pipe_elbow_valve", "pos": Vector3(16.2, 1.0, z), "rot_y": 90.0, "collide": false})
+	props.append({"model": "desk_office", "pos": Vector3(26.6, 0.0, 65.0), "rot_y": 90.0, "tilt": Vector3(0, 0, 3)})
+	props.append({"model": "chair_tipped", "pos": Vector3(25.2, 0.0, 66.6), "rot_y": 200.0, "collide": false})
+	_candles(rng, Vector3(26.4, 0.0, 63.2), 9)
+	_candles(rng, Vector3(26.6, 0.74, 65.0), 3, 0.3)
+	props.append({"model": "copal_censer", "pos": Vector3(27.2, 0, 67.0), "collide": false})
+	lights.append({"pos": Vector3(26.0, 1.2, 64.6), "color": WARM, "energy": 1.4, "radius": 7.5})
+	# Ensanche de los archiveros (respiro de D11): un fichero volcado y la cartera flotando.
+	props.append({"model": "filing_cabinet", "pos": Vector3(35.4, -0.2, 119.0), "rot_y": 20.0, "tilt": Vector3(0, 0, 70), "collide": false})
+	props.append({"model": "filing_cabinet", "pos": Vector3(35.2, 0.0, 122.6), "rot_y": -10.0})
+	props.append({"model": "desk_office", "pos": Vector3(36.4, -0.3, 124.0), "rot_y": 80.0, "tilt": Vector3(6, 0, -10), "collide": false})
+	props.append({"model": "wallet_open", "pos": Vector3(41.6, 0.15, 119.4), "rot_y": 25.0, "collide": false})
+	_candles(rng, Vector3(43.0, 0, 121.0), 9, 0.5)
+	props.append({"model": "copal_censer", "pos": Vector3(43.2, 0, 122.4), "collide": false})
+	lights.append({"pos": Vector3(42.6, 0.9, 121.0), "color": WARM, "energy": 1.35, "radius": 6.5})
 
 	# Cámara de barro negro: altar de la H. Su luz se derrama por el vano y es el punto de fuga.
-	var altar: Vector3 = Vector3(37, 0, 367)
+	var altar: Vector3 = Vector3(37, 0, 155)
 	for i: int in 5:
 		var x: float = 33.6 + i * 1.7
-		props.append({"model": "clay_pot_black", "pos": Vector3(x, 0, 369.0), "rot_y": i * 71.0, "scale": 1.0 + 0.25 * (i % 2), "collide": false})
+		props.append({"model": "clay_pot_black", "pos": Vector3(x, 0, 157.6), "rot_y": i * 71.0, "scale": 1.0 + 0.25 * (i % 2), "collide": false})
 		if i != 2:
-			props.append({"model": "sugar_skull", "pos": Vector3(x, 0.45 + 0.11 * (i % 2), 369.0), "rot_y": 180.0, "collide": false})
+			props.append({"model": "sugar_skull", "pos": Vector3(x, 0.45 + 0.11 * (i % 2), 157.6), "rot_y": 180.0, "collide": false})
 	props.append({"model": "ofrenda_tier", "pos": altar + Vector3(0, 0, 0.9), "collide": false})
 	props.append({"model": "marigold_vase", "pos": altar + Vector3(-0.7, 0.45, 0.9), "collide": false})
 	props.append({"model": "marigold_vase", "pos": altar + Vector3(0.7, 0.45, 0.9), "collide": false})
@@ -184,13 +184,13 @@ func _dress() -> void:
 	_candles(rng, altar + Vector3(-2.2, 0, 0.3), 8, 0.7)
 	_candles(rng, altar + Vector3(2.2, 0, 0.3), 8, 0.7)
 	for x: float in [34.5, 39.5]:
-		props.append({"model": "marigold_pile", "pos": Vector3(x, 0, 365.5), "rot_y": x * 20.0, "collide": false})
+		props.append({"model": "marigold_pile", "pos": Vector3(x, 0, 152.6), "rot_y": x * 20.0, "collide": false})
 	lights.append({"pos": altar + Vector3(0, 1.1, -0.4), "color": WARM, "energy": 1.5, "radius": 8.0})
 	lights.append({"pos": altar + Vector3(0, 2.0, 0.3), "color": MAGENTA, "energy": 0.45, "radius": 9.0})
 	# Etiqueta de calaverita junto al muro (D12): una veladora la señala.
-	props.append({"model": "sugar_skull", "pos": Vector3(36.1, 0.0, 356.4), "rot_y": 90.0, "collide": false})
-	props.append({"model": "candle_mid", "pos": Vector3(36.15, 0.0, 356.9), "collide": false})
-	lights.append({"pos": Vector3(36.5, 0.5, 356.8), "color": WARM, "energy": 0.6, "radius": 3.0})
+	props.append({"model": "sugar_skull", "pos": Vector3(36.1, 0.0, 141.0), "rot_y": 90.0, "collide": false})
+	props.append({"model": "candle_mid", "pos": Vector3(36.15, 0.0, 141.6), "collide": false})
+	lights.append({"pos": Vector3(36.5, 0.5, 141.4), "color": WARM, "energy": 0.6, "radius": 3.0})
 
 
 func _candles(rng: RandomNumberGenerator, centre: Vector3, count: int, spread: float = 0.9) -> void:

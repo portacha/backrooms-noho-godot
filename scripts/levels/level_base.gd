@@ -18,6 +18,13 @@ var entity: Olvidado = null
 ## 0 = backrooms (lo que la mente pone), 1 = lo real. Solo en niveles con `dual_reality`.
 var reality: float = 1.0
 
+## Niebla de cada piel (densidad < 0 = el nivel no la cambia): polvo claro de oficina frente a la
+## bruma espesa y teñida de lo real.
+var fog_real_color: Color = Color(0.03, 0.03, 0.03)
+var fog_real_density: float = -1.0
+var fog_backrooms_color: Color = Color(0.05, 0.045, 0.02)
+var fog_backrooms_density: float = 0.012
+
 var _checkpoints: Array[Dictionary] = []
 var _reality_tween: Tween = null
 var _petal_count: int = 0
@@ -34,6 +41,7 @@ func _ready() -> void:
 	RenderingServer.global_shader_parameter_set(&"world_light", 1.0)
 	RenderingServer.global_shader_parameter_set(&"flicker_override", -1.0)
 	set_reality(1.0)
+	_spawn_hero_props()
 	# Cansancio sin barra: oscurecimiento periférico leve (docs/13 §3.3).
 	player.exhaustion_changed.connect(func(ratio: float) -> void: screen_fx.vignette = ratio * 0.45)
 	hud.reading_started.connect(_on_reading_changed.bind(true))
@@ -342,6 +350,100 @@ func finish_level(from_color: Color = Color.BLACK, fade_time: float = 2.0) -> vo
 	tween.tween_callback(func() -> void: Game.next_level(from_color))
 
 
+# --- Elementos principales con textura (Meshy) --------------------------------------------
+
+const HERO_SHADER: Shader = preload("res://shaders/hero_prop.gdshader")
+
+## Instancia los modelos "hero" que el constructor dejó aparte y les da las cuatro luces
+## horneadas más fuertes de su sitio. Sigue sin haber luces en tiempo real (regla dura 4).
+func _spawn_hero_props() -> void:
+	var records: Array = geo.get_meta("hero_props", [])
+	if records.is_empty():
+		return
+	var lights: Array = geo.get_meta("lights", [])
+	var tube_color: Color = geo.get_meta("flicker_color", Color(1.0, 0.93, 0.7))
+	var dual: bool = _is_dual()
+	var holder: Node3D = Node3D.new()
+	holder.name = "HeroProps"
+	add_child(holder)
+	var cache: Dictionary = {}
+	for record: Dictionary in records:
+		var model: String = record["model"]
+		if not cache.has(model):
+			cache[model] = load("res://assets/models/hero/%s.glb" % model)
+		var instance: Node3D = (cache[model] as PackedScene).instantiate() as Node3D
+		holder.add_child(instance)
+		instance.global_transform = geo.global_transform * (record["transform"] as Transform3D)
+		light_hero(instance, lights, tube_color, dual, 1.0 if model.ends_with("_giant") else 0.0)
+
+
+## Aplica el shader de elemento principal a un modelo texturizado ya colocado.
+func light_hero(instance: Node3D, lights: Array, tube_color: Color, dual: bool, glow_energy: float = 0.0) -> void:
+	var bounds_centre: Vector3 = instance.global_position
+	var meshes: Array[Node] = instance.find_children("*", "MeshInstance3D", true, false)
+	if not meshes.is_empty():
+		var first: MeshInstance3D = meshes[0] as MeshInstance3D
+		bounds_centre = first.global_transform * first.get_aabb().get_center()
+	# Las cuatro luces reales que más aportan en el centro del objeto; los tubos van aparte.
+	var ranked: Array[Dictionary] = []
+	var tubes: float = 0.0
+	for light: Dictionary in lights:
+		var radius: float = light["radius"]
+		var distance: float = (light["pos"] as Vector3).distance_to(bounds_centre)
+		if distance >= radius:
+			continue
+		var falloff: float = 1.0 - distance / radius
+		var weight: float = float(light["energy"]) * falloff * falloff
+		if bool(light.get("flicker", false)):
+			tubes += weight
+		else:
+			ranked.append({"weight": weight, "light": light})
+	ranked.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a["weight"] > b["weight"])
+	var positions: PackedVector3Array = PackedVector3Array()
+	var colors: PackedVector3Array = PackedVector3Array()
+	var radii: PackedFloat32Array = PackedFloat32Array()
+	for i: int in 4:
+		if i < ranked.size():
+			var light: Dictionary = ranked[i]["light"]
+			var color: Color = (light["color"] as Color) * float(light["energy"])
+			positions.append(light["pos"])
+			colors.append(Vector3(color.r, color.g, color.b))
+			radii.append(light["radius"])
+		else:
+			positions.append(Vector3.ZERO)
+			colors.append(Vector3.ZERO)
+			radii.append(0.01)
+	for node: Node in meshes:
+		var mesh_instance: MeshInstance3D = node as MeshInstance3D
+		mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		for surface: int in mesh_instance.mesh.get_surface_count():
+			var source: BaseMaterial3D = mesh_instance.get_active_material(surface) as BaseMaterial3D
+			var material: ShaderMaterial = ShaderMaterial.new()
+			material.shader = HERO_SHADER
+			if source != null:
+				material.set_shader_parameter("albedo_tex", source.albedo_texture)
+			material.set_shader_parameter("light_pos", positions)
+			material.set_shader_parameter("light_col", colors)
+			material.set_shader_parameter("light_rad", radii)
+			material.set_shader_parameter("tube_light", Vector3(tube_color.r, tube_color.g, tube_color.b) * tubes)
+			material.set_shader_parameter("glow_energy", glow_energy)
+			# Lo fosforescente se alumbra a sí mismo: sus colores no dependen de la luz cian.
+			material.set_shader_parameter("self_light", 0.3 if glow_energy > 0.0 else 0.0)
+			material.set_shader_parameter("dual", dual)
+			mesh_instance.set_surface_override_material(surface, material)
+
+
+## ¿El nivel se horneó con doble realidad? (lo delata el parámetro `dual` de sus materiales).
+func _is_dual() -> bool:
+	for node: Node in geo.find_children("*", "MeshInstance3D", true, false):
+		var mesh: Mesh = (node as MeshInstance3D).mesh
+		if mesh != null and mesh.get_surface_count() > 0:
+			var material: ShaderMaterial = mesh.surface_get_material(0) as ShaderMaterial
+			if material != null:
+				return material.get_shader_parameter("dual") == true
+	return false
+
+
 # --- Doble realidad ------------------------------------------------------------------------
 # Los backrooms son la forma en que la mente del oficinista compensa lo que de verdad hay. Las
 # paredes son las mismas; cambia su piel. Nunca hay un corte limpio: parpadea o se va la luz.
@@ -349,6 +451,10 @@ func finish_level(from_color: Color = Color.BLACK, fade_time: float = 2.0) -> vo
 func set_reality(value: float) -> void:
 	reality = clampf(value, 0.0, 1.0)
 	RenderingServer.global_shader_parameter_set(&"reality", reality)
+	var world: WorldEnvironment = get_node_or_null("WorldEnvironment") as WorldEnvironment
+	if fog_real_density >= 0.0 and world != null:
+		world.environment.fog_light_color = fog_backrooms_color.lerp(fog_real_color, reality)
+		world.environment.fog_density = lerpf(fog_backrooms_density, fog_real_density, reality)
 	_on_reality_changed()
 
 

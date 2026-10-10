@@ -20,6 +20,8 @@ func _init() -> void:
 	baseboard_height = 0.0
 	ambient = Color(0.016, 0.013, 0.026)
 	bounce = 0.3
+	ao_strength = 2.0
+	contact_strength = 0.6
 	materials = {
 		&"carpet": {"texture": "res://assets/textures/office_carpet_torn.png", "uv_scale": 2.0, "texture_saturation": 0.55},
 		&"rock": {"texture": "res://assets/textures/cavern_rock.png", "uv_scale": 2.0, "texture_gain": 1.3},

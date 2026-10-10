@@ -47,6 +47,14 @@ var props: Array[Dictionary] = []
 ## activo, las luces `flicker: true` son las de backrooms (solo alumbran con reality = 0) y el
 ## resto las reales. Emisivos: `reality_side` 1 = solo en lo real, -1 = solo en backrooms.
 var dual_reality: bool = false
+## Los modelos con versión texturizada en `assets/models/hero/` (Meshy) no se funden en la malla:
+## quedan en el meta `hero_props` y el nivel los instancia con `shaders/hero_prop.gdshader`.
+var hero_props: bool = true
+## Oclusión ambiental horneada: exponente sobre la luz real (1 = como siempre; 2–3 = rincones y
+## encuentros muro-suelo bien marcados) y sombra de contacto bajo los objetos apoyados en el suelo.
+var ao_strength: float = 1.0
+var contact_radius: float = 0.55
+var contact_strength: float = 0.0
 
 
 ## Letrero de pared o colgante (modelos `sign_*`). `facing` = hacia dónde mira su cara (unitario).
