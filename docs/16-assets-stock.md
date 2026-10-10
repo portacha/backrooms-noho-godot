@@ -213,3 +213,51 @@ Carpet016_1K-JPG.zip           b9e67b5d42cb47cead082dedae3767ae228175c857b6b3af6
 ```
 
 La descarga prueba acceso técnico e integridad, **no adecuación artística ni rendimiento en Godot**. Las fuentes no probadas quedan marcadas como condicionales. Antes de reutilizar una receta tras cambios de proveedor, revisar ficha, licencia y API vigentes; Context7 resolvió Poly Haven como `/websites/api_polyhaven`, pero las respuestas reales y los términos oficiales actuales prevalecen sobre ejemplos indexados inconsistentes.
+
+## 9. Meshy.ai — personajes generados, rigging y animación
+
+> **Añadido 2026-10-09** por decisión del usuario. Clave `MESHYAI` en `.env` (nunca se imprime ni se versiona). Saldo inicial: **1 000 créditos**, compartidos por todo el proyecto.
+
+### Cuándo usarlo
+
+| Caso | ¿Meshy? |
+|---|---|
+| **El Olvidado** (malla orgánica, esqueleto, animaciones) | **Sí**: es el motivo de tener la clave |
+| Otro elemento **orgánico o esculpido** que por script de Blender queda pobre (calavera gigante, relieve de barro negro, roca) | Sí, si es importante y tras intentar el modelado propio |
+| Mobiliario, arquitectura, utilería geométrica, letras, piezas de marca | **No**: Blender por script (`tools/blender/build_models.py`), como siempre |
+| Relleno secundario | No: stock CC0 primero (este documento) |
+
+Meshy no sustituye la regla dura 10 ni la estética: lo generado se **adapta** (escala, origen, reducción de polígonos, paleta oscura y desaturada) antes de entrar al juego.
+
+### Flujo obligatorio: imagen primero, luego 3D
+
+1. **Imagen de referencia con OpenAI** (`tools/assets/gen_image.py`, clave `openaiKey`): una sola figura completa, de frente, **pose en A**, fondo liso neutro, luz plana, sin sombras proyectadas ni texto. Estilo low-poly moderno (variante B de `concept/art/`). Se guarda en `builds/meshy/<nombre>/ref.png` y se **mira** antes de gastar créditos; si no convence, se regenera la imagen (barato), no el modelo (caro).
+2. **Imagen → 3D** con `tools/assets/meshy.py image-to-3d` (la imagen va como data URI en base64; no hace falta alojarla).
+3. **Rigging** (`meshy.py rig`, solo humanoides en pose A/T) y **animaciones** (`meshy.py animate`, acciones de la biblioteca de Meshy).
+4. **Adaptación** en Blender por script (`blender -b -P …`): escala real, origen en el suelo, limpieza, un solo material, textura ≤ 1024 px, clips renombrados; exportar `.glb` a `assets/models/`.
+5. **Registro** en `assets/CREDITS.md` en el mismo cambio: herramienta, fecha, IDs de tarea, prompt de la imagen, modificaciones.
+
+### API (verificada el 2026-10-09 en docs.meshy.ai)
+
+Base `https://api.meshy.ai`, cabecera `Authorization: Bearer $MESHYAI`. Todas las tareas son asíncronas: `POST` devuelve `{"result": "<id>"}` y se consulta con `GET …/<id>` hasta `status` `SUCCEEDED`/`FAILED`. Las URLs de resultado **caducan**: descargar enseguida.
+
+| Paso | Endpoint | Parámetros que usamos |
+|---|---|---|
+| Imagen → 3D | `POST /openapi/v1/image-to-3d` | `image_url` (URL o data URI), `ai_model: "latest"`, `model_type: "lowpoly"` (no admitido por `meshy-6-lite`), `topology: "triangle"`, `should_remesh: true`, `target_polycount` (mín. 1000; personajes 5 000–8 000), `should_texture: true`, `texture_resolution: "1024"`, `enable_pbr: false`, `pose_mode: "a-pose"`, `target_formats: ["glb"]`, `enable_thumbnail: true` |
+| Rigging | `POST /openapi/v1/rigging` | `input_task_id` (o `model_url`), `height_meters`. Devuelve el personaje con esqueleto y dos clips básicos (caminar, correr) |
+| Animación | `POST /openapi/v1/animations` | `rig_task_id` + `action_id` o `action_ids` (1–10: un archivo con un clip por acción); `post_process: {operation_type: "change_fps", fps: 24}` |
+| Consumo | Usage API / saldo | Consultar **antes y después** de cada tanda |
+
+### Presupuesto de créditos
+
+- Costes observados en la documentación: imagen → 3D con textura ≈ 20–30 créditos, rigging ≈ 5, animación ≈ 3 por tarea. `meshy.py` lee `consumed_credits` de cada tarea y lleva la cuenta en `builds/meshy/ledger.json`.
+- **Topes**: El Olvidado ≤ 300 créditos en total (incluidos reintentos); cualquier otro objeto ≤ 60. Nunca bajar de **200 créditos de reserva** sin preguntar al usuario.
+- Máximo **3 intentos** de imagen → 3D por objeto. Si el tercero no sirve, se vuelve al modelado propio y se anota por qué.
+- Un agente que use Meshy escribe en su informe: saldo antes/después, tareas lanzadas y créditos de cada una.
+
+### Restricciones del juego que lo generado debe cumplir
+
+- Renderer Compatibility, Web de un hilo: malla con esqueleto ≤ 8 000 triángulos, **un material**, una textura ≤ 1024 px, ≤ 60 huesos, animaciones a 24 fps.
+- Sin luz propia: la entidad se ve por la linterna y como silueta contra la niebla (`docs/05`, regla dura 4).
+- Peso: cada `.glb` generado ≤ 3 MB (presupuesto total < 100 MB, regla dura 8).
+- Canon: diseño **original** (`docs/01`, `docs/05`); nada que recuerde a entidades de las wikis de Backrooms.
