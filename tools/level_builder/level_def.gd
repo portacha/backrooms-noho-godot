@@ -42,6 +42,11 @@ var flicker_color: Color = Color(1.0, 0.9, 0.72)
 ## `tilt: Vector3` finito, grados X/Z (Y debe ser 0; se usa rot_y). Defecto Vector3.ZERO.
 ## Un prop inclinado usa la AABB mundial como colisión/oclusor; sin inclinación conserva su caja.
 var props: Array[Dictionary] = []
+## Doble realidad: cada material puede llevar su piel de backrooms (`alt_texture`, `alt_uv_scale`,
+## `alt_tint`) y el global de shader `reality` (0 = backrooms, 1 = real) elige cuál se ve. Con esto
+## activo, las luces `flicker: true` son las de backrooms (solo alumbran con reality = 0) y el
+## resto las reales. Emisivos: `reality_side` 1 = solo en lo real, -1 = solo en backrooms.
+var dual_reality: bool = false
 
 
 ## Letrero de pared o colgante (modelos `sign_*`). `facing` = hacia dónde mira su cara (unitario).

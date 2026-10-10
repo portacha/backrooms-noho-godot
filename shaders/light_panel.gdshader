@@ -4,6 +4,9 @@ render_mode unshaded;
 uniform vec3 panel_color : source_color = vec3(1.0);
 uniform float energy = 1.0;
 uniform bool flicker = false;
+// Doble realidad: los fluorescentes son de backrooms; en lo real están muertos.
+uniform bool dual = false;
+global uniform float reality;
 global uniform float world_light;
 global uniform float flicker_seed;
 // < 0: parpadeo propio de cada tubo; >= 0: nivel que dicta el guion del nivel (prólogo).
@@ -30,5 +33,5 @@ void fragment() {
 	vec2 visibility = vec2(1.0) - smoothstep(vec2(0.3), vec2(1.0), fwidth(ribs));
 	vec2 pattern = cos(ribs * 6.2831853) * visibility;
 	float diffuser = 0.94 + 0.03 * (pattern.x + pattern.y);
-	ALBEDO = panel_color * energy * panel_data.rgb * baked_energy * diffuser * world_light * (flicker ? flick(TIME) : 1.0);
+	ALBEDO = panel_color * energy * panel_data.rgb * baked_energy * diffuser * world_light * (flicker ? flick(TIME) : 1.0) * (dual ? 1.0 - reality : 1.0);
 }

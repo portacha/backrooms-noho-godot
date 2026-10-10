@@ -4,10 +4,16 @@ render_mode diffuse_lambert, cull_back;
 // Agua turbia del Nivel 3: negra y lisa, refleja la luz de las calaveras (horneada en los
 // vértices por el nivel) y lleva manchas de cempasúchil a la deriva. La linterna la ilumina.
 global uniform float world_light;
+// Doble realidad: en backrooms el agua se ve como la alfombra empapada (pero sigue sonando).
+global uniform float reality;
+global uniform float reality_seed;
+uniform sampler2D carpet_tex : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform vec3 tube_color : source_color = vec3(1.0, 0.93, 0.7);
 uniform sampler2D petals_tex : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform vec3 deep_color : source_color = vec3(0.004, 0.011, 0.013);
 uniform float flower_cover : hint_range(0.0, 1.0) = 0.5;
 varying vec3 lit;
+varying float tube;
 varying vec3 world_pos;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -19,7 +25,8 @@ float noise(vec2 p) {
 }
 
 void vertex() {
-	lit = COLOR.rgb;
+	lit = COLOR.rgb * reality;
+	tube = COLOR.a * (1.0 - reality);
 	world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 }
 
@@ -40,4 +47,13 @@ void fragment() {
 	EMISSION = mix(deep_color + reflection, flowers * (0.035 + brightness * 1.25), petal) * world_light;
 	ROUGHNESS = mix(0.08, 0.95, petal);
 	SPECULAR = mix(0.6, 0.1, petal);
+	vec3 block = floor(world_pos * 0.85 + 0.013);
+	float order = fract(sin(dot(block, vec3(12.9898, 78.233, 37.719)) + reality_seed * 17.0) * 43758.5453);
+	if (order > reality * 1.04 - 0.02) {
+		vec3 carpet = texture(carpet_tex, world_pos.xz * 0.5).rgb * 0.8;
+		ALBEDO = carpet;
+		EMISSION = carpet * tube * 2.0 * tube_color * world_light;
+		ROUGHNESS = 0.7;
+		SPECULAR = 0.2;
+	}
 }

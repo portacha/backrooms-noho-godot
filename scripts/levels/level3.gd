@@ -19,6 +19,8 @@ var _broken: Node3D = null
 var _wall_collision: CollisionShape3D = null
 var _documents: Array[DocumentPickup] = []
 var _hint: Array[MeshInstance3D] = []
+var _reality_step: int = 0
+var _glimpse_in: float = 30.0
 var _budget_spent: bool = false
 var _budget_relocated: bool = false
 
@@ -53,6 +55,12 @@ func _ready() -> void:
 	entity.state_changed.connect(_on_state_changed)
 	player.noise_made.connect(_on_noise)
 	var saved: String = spawn_at_checkpoint("start", PI)
+	# Estado de realidad que corresponde al punto de reaparición.
+	set_reality(0.0)
+	for beat: Dictionary in REALITY_BEATS:
+		if player.global_position.z >= float(beat["z"]):
+			_reality_step += 1
+			set_reality(beat["to"])
 	_last_position = player.global_position
 	if saved == "r1" or saved == "r2":
 		hunter_started = true
@@ -74,6 +82,7 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	super(delta)
+	_update_reality(delta)
 	update_letter_fx(altar)
 	if not hunter_started and player.global_position.z >= marker("hunter_gate").z:
 		hunter_started = true
@@ -117,12 +126,49 @@ func _physics_process(_delta: float) -> void:
 					_budget_relocated = true
 
 
+## Doble realidad (docs/04, contaminación 50 %). El nivel abre como un pasillo más de backrooms;
+## la primera calavera lo rompe. Tras cada respiro la mente vuelve a poner la oficina —se camina
+## sobre "alfombra" que salpica— y un apagón la retira cuando llega el cazador. Entre medias,
+## recaídas de medio segundo. En persecución no hay consuelo: todo es real.
+const REALITY_BEATS: Array[Dictionary] = [
+	{"z": 36.0, "to": 1.0, "how": "flicker"},
+	{"z": 96.0, "to": 0.0, "how": "blackout"},
+	{"z": 150.0, "to": 1.0, "how": "blackout"},
+	{"z": 246.0, "to": 0.0, "how": "flicker"},
+	{"z": 284.0, "to": 1.0, "how": "blackout"},
+]
+
+
+func _update_reality(delta: float) -> void:
+	if drained:
+		return
+	var z: float = player.global_position.z
+	while _reality_step < REALITY_BEATS.size() and z >= float(REALITY_BEATS[_reality_step]["z"]):
+		var beat: Dictionary = REALITY_BEATS[_reality_step]
+		_reality_step += 1
+		if _reality_step < REALITY_BEATS.size() and z >= float(REALITY_BEATS[_reality_step]["z"]):
+			continue
+		if beat["how"] == "blackout":
+			blackout_reality(beat["to"])
+		else:
+			flicker_reality(beat["to"])
+	if entity != null and entity.current_state() in [&"Chase", &"Attack"]:
+		if reality < 0.5:
+			flicker_reality(1.0, 0.5)
+		return
+	_glimpse_in -= delta
+	if _glimpse_in <= 0.0 and _reality_step > 0 and not hud.is_reading:
+		_glimpse_in = randf_range(22.0, 48.0)
+		glimpse_reality(1.0 - roundf(reality), randf_range(0.25, 0.7))
+
+
 ## Agua: una malla a ras de 0,14 m sobre las celdas inundadas. Como no pasa por el horneado, su
 ## "reflejo" se calcula aquí por vértice con las mismas luces que horneó el constructor.
 func _build_water() -> void:
 	var material: ShaderMaterial = ShaderMaterial.new()
 	material.shader = load("res://shaders/water_surface.gdshader") as Shader
 	material.set_shader_parameter("petals_tex", load("res://assets/textures/water_marigold.png"))
+	material.set_shader_parameter("carpet_tex", load("res://assets/textures/backrooms_carpet.png"))
 	var lights: Array = geo.get_meta("lights", [])
 	var size: float = geo.get_meta("cell_size")
 	var tool: SurfaceTool = SurfaceTool.new()
@@ -147,7 +193,7 @@ func _build_water() -> void:
 
 ## Luz que llega a un punto del agua (sin oclusión: el túnel ya separa unas luces de otras).
 func _water_light(at: Vector3, lights: Array) -> Color:
-	var total: Color = Color(0, 0, 0)
+	var total: Color = Color(0, 0, 0, 0)
 	for light: Dictionary in lights:
 		var position_light: Vector3 = light["pos"]
 		var radius: float = light["radius"]
@@ -155,7 +201,12 @@ func _water_light(at: Vector3, lights: Array) -> Color:
 		if distance >= radius:
 			continue
 		var falloff: float = 1.0 - distance / radius
-		total += (light["color"] as Color) * float(light["energy"]) * falloff * falloff
+		# Los tubos de backrooms van aparte, en alfa, como en el horneado.
+		if bool(light.get("flicker", false)):
+			total.a += float(light["energy"]) * falloff * falloff
+		else:
+			var colour: Color = (light["color"] as Color) * float(light["energy"]) * falloff * falloff
+			total += Color(colour.r, colour.g, colour.b, 0.0)
 	return total
 
 
@@ -247,6 +298,7 @@ func _take_letter() -> void:
 
 
 func _open_wall() -> void:
+	set_reality(1.0)
 	_sound("clay_crack")
 	_wall.hide()
 	_broken.show()

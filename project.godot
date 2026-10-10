@@ -96,3 +96,11 @@ flicker_override={
 "type": "float",
 "value": -1.0
 }
+reality={
+"type": "float",
+"value": 1.0
+}
+reality_seed={
+"type": "float",
+"value": 0.0
+}

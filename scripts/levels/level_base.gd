@@ -15,7 +15,11 @@ const FINAL_CHASE_MARGIN: float = 1.5
 ## El Olvidado de este nivel, si lo hay (`spawn_entity`).
 var entity: Olvidado = null
 
+## 0 = backrooms (lo que la mente pone), 1 = lo real. Solo en niveles con `dual_reality`.
+var reality: float = 1.0
+
 var _checkpoints: Array[Dictionary] = []
+var _reality_tween: Tween = null
 var _petal_count: int = 0
 
 @onready var geo: Node3D = $Geo
@@ -29,6 +33,7 @@ var _petal_count: int = 0
 func _ready() -> void:
 	RenderingServer.global_shader_parameter_set(&"world_light", 1.0)
 	RenderingServer.global_shader_parameter_set(&"flicker_override", -1.0)
+	set_reality(1.0)
 	# Cansancio sin barra: oscurecimiento periférico leve (docs/13 §3.3).
 	player.exhaustion_changed.connect(func(ratio: float) -> void: screen_fx.vignette = ratio * 0.45)
 	hud.reading_started.connect(_on_reading_changed.bind(true))
@@ -335,6 +340,64 @@ func finish_level(from_color: Color = Color.BLACK, fade_time: float = 2.0) -> vo
 	var tween: Tween = create_tween()
 	tween.tween_property(screen_fx, "fade", 1.0, fade_time)
 	tween.tween_callback(func() -> void: Game.next_level(from_color))
+
+
+# --- Doble realidad ------------------------------------------------------------------------
+# Los backrooms son la forma en que la mente del oficinista compensa lo que de verdad hay. Las
+# paredes son las mismas; cambia su piel. Nunca hay un corte limpio: parpadea o se va la luz.
+
+func set_reality(value: float) -> void:
+	reality = clampf(value, 0.0, 1.0)
+	RenderingServer.global_shader_parameter_set(&"reality", reality)
+	_on_reality_changed()
+
+
+## Los niveles lo redefinen para lo que no pasa por el shader horneado (agua, audio, objetos).
+func _on_reality_changed() -> void:
+	pass
+
+
+## Las texturas tartamudean entre las dos pieles y se quedan en `target` (≈ `duration` s).
+func flicker_reality(target: float, duration: float = 1.4) -> void:
+	if _reality_tween != null:
+		_reality_tween.kill()
+	var from: float = reality
+	_reality_tween = create_tween()
+	var steps: int = maxi(4, int(duration / 0.09))
+	for i: int in steps:
+		var progress: float = float(i + 1) / steps
+		# Cada salto cae en un punto distinto entre las dos pieles y reordena los parches.
+		var value: float = target if i == steps - 1 else clampf(lerpf(from, target, progress) + randf_range(-0.45, 0.45), 0.0, 1.0)
+		_reality_tween.tween_callback(func() -> void:
+			RenderingServer.global_shader_parameter_set(&"reality_seed", randf() * 100.0)
+			set_reality(value))
+		_reality_tween.tween_interval(randf_range(0.03, 0.14))
+	Game.caption("[las paredes parpadean]", 2.0)
+
+
+## Se va toda la luz; cuando vuelve, el lugar es otro (`dark` s a oscuras).
+func blackout_reality(target: float, dark: float = 1.1) -> void:
+	if _reality_tween != null:
+		_reality_tween.kill()
+	_reality_tween = create_tween()
+	_reality_tween.tween_method(set_world_light, 1.0, 0.0, 0.12)
+	_reality_tween.tween_callback(func() -> void:
+		player.flashlight.pulse_blackout(dark + 0.25)
+		RenderingServer.global_shader_parameter_set(&"reality_seed", randf() * 100.0)
+		set_reality(target))
+	_reality_tween.tween_interval(dark)
+	_reality_tween.tween_method(set_world_light, 0.0, 1.0, 0.35)
+	Game.caption("[se va la luz]", 2.0)
+
+
+## Recaída breve: la otra piel asoma `seconds` y se va (alucinación pasajera).
+func glimpse_reality(value: float, seconds: float = 0.5) -> void:
+	var back: float = reality
+	RenderingServer.global_shader_parameter_set(&"reality_seed", randf() * 100.0)
+	set_reality(value)
+	await get_tree().create_timer(seconds).timeout
+	if is_equal_approx(reality, value):
+		set_reality(back)
 
 
 # --- Utilidades ----------------------------------------------------------------------------

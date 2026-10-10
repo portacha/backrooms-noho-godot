@@ -1,7 +1,8 @@
 extends LevelDef
 ## Nivel 3 — "El Pasaje de las Calaveras" (docs/04, docs/12 §8.3).
-## Contaminación 50 %: el nivel EMPIEZA siendo backrooms (papel tapiz, alfombra, fluorescentes) y
-## se va volviendo túnel; los restos de oficina siguen apareciendo hasta el final.
+## Contaminación 50 %, en DOBLE REALIDAD: las mismas paredes tienen piel de backrooms (papel tapiz,
+## alfombra, fluorescentes: lo que la mente del oficinista pone para soportarlo) y piel real
+## (túnel inundado). El guion del nivel las alterna con parpadeos y apagones; no hay frontera.
 ## Túnel de mantenimiento inundado. Fotografía: negro húmedo, fosforescencia cian de las
 ## calaveras como única luz clave (charcos cada 16 m con tramos negros entre ellos), cempasúchil
 ## naranja flotando como acento, y lo cálido reservado a refugios (veladora en cada boca de
@@ -22,35 +23,31 @@ func _init() -> void:
 	visibility_range = 46.0
 	ambient = Color(0.006, 0.010, 0.012)
 	bounce = 0.28
+	dual_reality = true
+	flicker_color = Color(1.0, 0.93, 0.7)
+	var wallpaper: String = "res://assets/textures/backrooms_wallpaper.png"
+	# Cada superficie lleva dos pieles: la real (túnel) y la de backrooms que la mente le pone.
 	materials = {
-		&"concrete": {"texture": "res://assets/textures/tunnel_concrete_wet.png", "uv_scale": 3.4, "texture_gain": 1.25},
-		&"wallpaper": {"texture": "res://assets/textures/backrooms_wallpaper.png", "uv_scale": 1.5},
-		&"peeling": {"texture": "res://assets/textures/wallpaper_peeling.png", "uv_scale": 2.6},
-		&"carpet": {"texture": "res://assets/textures/backrooms_carpet.png", "uv_scale": 2.0},
-		&"tiles": {"texture": "res://assets/textures/backrooms_ceiling.png", "uv_scale": 1.2},
+		&"wall": {"texture": "res://assets/textures/tunnel_concrete_wet.png", "uv_scale": 3.4, "texture_gain": 1.25, "alt_texture": wallpaper, "alt_uv_scale": 1.5},
+		&"floor": {"texture": "res://assets/textures/tunnel_concrete_wet.png", "uv_scale": 3.4, "alt_texture": "res://assets/textures/backrooms_carpet.png", "alt_uv_scale": 2.0},
+		&"ceiling": {"texture": "res://assets/textures/tunnel_concrete_wet.png", "uv_scale": 3.4, "texture_gain": 0.9, "alt_texture": "res://assets/textures/backrooms_ceiling.png", "alt_uv_scale": 1.2},
 		&"metal": {"texture": "res://assets/textures/duct_metal.png", "uv_scale": 1.2},
-		&"clay": {"texture": "res://assets/textures/clay_black.png", "uv_scale": 4.0, "texture_gain": 1.0},
-		&"glow": {"tint": CYAN, "emissive": true, "energy": 2.2},
+		&"clay": {"texture": "res://assets/textures/clay_black.png", "uv_scale": 2.6, "texture_gain": 0.75, "alt_texture": wallpaper, "alt_uv_scale": 1.5},
+		&"glow": {"tint": CYAN, "emissive": true, "energy": 2.2, "reality_side": 1.0},
 		&"flame": {"tint": Color(1.0, 0.72, 0.3), "emissive": true, "energy": 2.4},
 	}
+	var tube: Dictionary = {"color": Color(1.0, 0.95, 0.74), "energy": 1.15, "radius": 9.5, "flicker": true}
 	tiles = {
-		"#": {"solid": true, "wall": &"concrete"},
-		".": {"floor": &"concrete", "ceiling": &"concrete", "wall": &"concrete", "zone": "water"},
-		"s": {"floor": &"concrete", "ceiling": &"concrete", "wall": &"concrete"},
+		"#": {"solid": true, "wall": &"wall"},
+		".": {"floor": &"floor", "ceiling": &"ceiling", "zone": "water"},
+		",": {"floor": &"floor", "ceiling": &"ceiling", "zone": "water", "light": tube},
+		"s": {"floor": &"floor", "ceiling": &"ceiling"},
+		"S": {"floor": &"floor", "ceiling": &"ceiling", "light": tube},
 		"d": {"floor": &"metal", "ceiling": &"metal", "wall": &"metal", "height": 1.2, "nav": false, "zone": "duct"},
-		"r": {"floor": &"concrete", "ceiling": &"concrete", "wall": &"concrete", "zone": "remanso"},
-		"w": {"floor": &"concrete", "ceiling": &"concrete", "wall": &"concrete", "zones": ["water", "remanso"]},
+		"r": {"floor": &"floor", "ceiling": &"ceiling", "zone": "remanso"},
+		"w": {"floor": &"floor", "ceiling": &"ceiling", "zones": ["water", "remanso"]},
 		"c": {"floor": &"clay", "ceiling": &"clay", "wall": &"clay", "height": 4.4, "zone": "remanso"},
 		"b": {"solid": true, "wall": &"clay"},
-		# Backrooms que se deshacen: llegada (A), papel desprendido (B) y alfombra ya bajo el agua (k).
-		"W": {"solid": true, "wall": &"wallpaper"},
-		"P": {"solid": true, "wall": &"peeling"},
-		"A": {"floor": &"carpet", "ceiling": &"tiles", "height": 2.8},
-		"L": {"floor": &"carpet", "ceiling": &"tiles", "height": 2.8, "light": {"color": Color(1.0, 0.95, 0.74), "energy": 1.0, "radius": 8.0, "flicker": false}},
-		"F": {"floor": &"carpet", "ceiling": &"tiles", "height": 2.8, "light": {"color": Color(1.0, 0.95, 0.74), "energy": 0.9, "radius": 7.0, "flicker": true}},
-		"B": {"floor": &"carpet", "ceiling": &"concrete", "height": 3.1},
-		"k": {"floor": &"carpet", "ceiling": &"concrete", "zone": "water"},
-		"f": {"floor": &"carpet", "ceiling": &"concrete", "zone": "water", "light": {"color": Color(1.0, 0.9, 0.62), "energy": 0.9, "radius": 7.0, "flicker": true}},
 	}
 	var grid: Array[String] = []
 	for y: int in 190:
@@ -101,24 +98,14 @@ func _init() -> void:
 
 ## Estaciones de calavera a lo largo de cada tramo recto: (columna izquierda, fila inicial, fila
 ## final, eje). La columna es la celda izquierda de un túnel de dos celdas de ancho.
+## Fluorescentes de backrooms a media distancia entre calavera y calavera: cuando la mente
+## vuelve a poner la oficina, alumbran ellos; en lo real están muertos.
 func _backrooms_remnants(grid: Array[String]) -> void:
-	# Llegada: 24 m de backrooms intactos, 24 m de papel desprendido, y el concreto toma el relevo.
-	for y: int in range(0, 14):
-		grid[y] = grid[y].replace("#", "W").replace("s", "A")
-	for y: int in range(14, 26):
-		grid[y] = grid[y].replace("#", "P").replace("s", "B")
-	for cell: Vector2i in [Vector2i(3, 3), Vector2i(4, 8)]:
-		grid[cell.y] = grid[cell.y].substr(0, cell.x) + "L" + grid[cell.y].substr(cell.x + 1)
-	for cell: Vector2i in [Vector2i(3, 12), Vector2i(4, 17), Vector2i(3, 22)]:
-		grid[cell.y] = grid[cell.y].substr(0, cell.x) + "F" + grid[cell.y].substr(cell.x + 1)
-	# La alfombra sigue bajo la primera agua.
-	for y: int in range(36, 46):
-		grid[y] = grid[y].replace(".", "k")
-	grid[40] = grid[40].substr(0, 10) + "f" + grid[40].substr(11)
-	# Más adentro quedan paños de papel tapiz, cada vez más escasos.
-	for span: Vector2i in [Vector2i(36, 45)]:
-		for y: int in range(span.x, span.y + 1):
-			grid[y] = grid[y].replace("#", "P")
+	for section: Vector3i in [Vector3i(3, 4, 32), Vector3i(10, 38, 68), Vector3i(18, 74, 104), Vector3i(8, 110, 142), Vector3i(18, 150, 174)]:
+		for y: int in range(section.y + 4, section.z + 1, SKULL_STEP):
+			var symbol: String = grid[y][section.x]
+			if symbol in [".", "s"]:
+				grid[y] = grid[y].substr(0, section.x) + ("," if symbol == "." else "S") + grid[y].substr(section.x + 1)
 
 
 func _dress() -> void:
@@ -128,11 +115,7 @@ func _dress() -> void:
 	for section: Vector3i in [Vector3i(3, 4, 32), Vector3i(10, 38, 68), Vector3i(18, 74, 104), Vector3i(8, 110, 142), Vector3i(18, 150, 174)]:
 		var centre_x: float = section.x * 2.0 + 2.0
 		for y: int in range(section.y, section.z + 1, SKULL_STEP):
-			if y < 26 or (y >= 36 and y < 46):
-				continue
 			var at: Vector3 = Vector3(centre_x, TUNNEL_HEIGHT, y * 2.0 + 1.0)
-			# Entre calavera y calavera, una luminaria muerta de la oficina que esto fue.
-			props.append({"model": "ceiling_fixture", "pos": at + Vector3(0.0, 0.0, 8.0), "collide": false})
 			station += 1
 			# Una de cada seis está muerta: el tramo negro donde la linterna es todo lo que hay.
 			var dead: bool = station % 6 == 4
@@ -146,7 +129,7 @@ func _dress() -> void:
 				props.append({"model": "marigold_raft", "pos": Vector3(at.x + rng.randf_range(-1.5, 1.5), 0.13, at.z + rng.randf_range(-3.0, 3.0)),
 					"rot_y": rng.randf_range(0.0, 360.0), "scale": rng.randf_range(0.8, 1.5), "collide": false})
 		# Tubería corrida por el muro izquierdo: línea de fuga hacia la siguiente calavera.
-		for y: int in range(maxi(section.y, 26), section.z + 1):
+		for y: int in range(section.y, section.z + 1):
 			props.append({"model": "pipe_run", "pos": Vector3(section.x * 2.0 + 0.12, 2.75, y * 2.0 + 1.0), "rot_y": 90.0, "collide": false})
 			if y % SKULL_STEP == (section.y + 4) % SKULL_STEP:
 				props.append({"model": "pipe_elbow_valve", "pos": Vector3(section.x * 2.0 + 0.16, 2.3, y * 2.0 + 1.0), "rot_y": 90.0, "collide": false})

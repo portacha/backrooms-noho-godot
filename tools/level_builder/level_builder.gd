@@ -743,6 +743,21 @@ func _material(key: StringName) -> ShaderMaterial:
 	material.set_shader_parameter("texture_saturation", float(settings.get("texture_saturation", 1.0)))
 	if bool(settings.get("emissive", false)):
 		material.set_shader_parameter("unlit_energy", float(settings.get("energy", 1.0)))
+		material.set_shader_parameter("emissive_side", float(settings.get("reality_side", 0.0)))
+	if _def.dual_reality:
+		material.set_shader_parameter("dual", true)
+		var alt_path: String = settings.get("alt_texture", "")
+		if not alt_path.is_empty() and ResourceLoader.exists(alt_path):
+			material.set_shader_parameter("alt_tex", load(alt_path))
+			material.set_shader_parameter("alt_tint", settings.get("alt_tint", Color.WHITE))
+			material.set_shader_parameter("alt_uv", float(settings.get("uv_scale", 2.0)) / maxf(float(settings.get("alt_uv_scale", 2.0)), 0.001))
+		elif key == PALETTE_MATERIAL and not _palette.is_empty():
+			material.set_shader_parameter("alt_tex", _palette_texture())
+		elif not String(settings.get("texture", "")).is_empty() and ResourceLoader.exists(settings["texture"]):
+			material.set_shader_parameter("alt_tex", load(settings["texture"]))
+			material.set_shader_parameter("alt_tint", settings.get("tint", Color.WHITE))
+		else:
+			material.set_shader_parameter("alt_tint", settings.get("tint", Color.WHITE))
 	var path: String = settings.get("texture", "")
 	if not path.is_empty():
 		if ResourceLoader.exists(path):
@@ -771,6 +786,7 @@ func _emit_panels() -> void:
 		var material: ShaderMaterial = ShaderMaterial.new()
 		material.shader = load("res://shaders/light_panel.gdshader") as Shader
 		material.set_shader_parameter("flicker", group == 1)
+		material.set_shader_parameter("dual", _def.dual_reality)
 		mesh.surface_set_material(group, material)
 	var panels: MeshInstance3D = MeshInstance3D.new()
 	panels.name = "LightPanels"
